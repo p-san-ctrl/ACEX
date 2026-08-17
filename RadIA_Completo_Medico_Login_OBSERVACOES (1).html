@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RadIA - Sistema de Diagnóstico por IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        #modal-view { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="text-center mb-10">
+                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-microscope text-blue-600 text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-800">RadIA</h1>
+                <p class="text-slate-500">Portal do Radiologista</p>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Nome do Médico</label>
+                    <input type="text" id="doctor-name" class="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dr. João Silva">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">CRM (Apenas números)</label>
+                    <input type="text" id="crm-input" class="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="123456">
+                </div>
+                <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95">
+                    Acessar Sistema
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP STRUCTURE -->
+    <div id="app-shell" class="hidden min-h-screen flex">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-slate-900 text-white flex flex-col">
+            <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+                <i class="fas fa-brain text-blue-400"></i>
+                <span class="font-bold text-xl tracking-tight">RadIA <span class="text-blue-400">v2.0</span></span>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fas fa-chart-line w-5"></i> Dashboard
+                </button>
+                <button onclick="showSection('new-exam')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fas fa-plus-circle w-5"></i> Novo Exame
+                </button>
+                <button onclick="showSection('history')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fas fa-folder-open w-5"></i> Histórico
+                </button>
+                <button onclick="showSection('logs')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fas fa-list-ul w-5"></i> Logs do Sistema
+                </button>
+            </nav>
+            <div class="p-4 border-t border-slate-800">
+                <div class="flex items-center gap-3 p-2 bg-slate-800 rounded-lg">
+                    <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs" id="user-avatar">DR</div>
+                    <div class="text-xs truncate">
+                        <p class="font-bold" id="user-name">Dr. Médico</p>
+                        <p class="text-slate-400" id="user-crm">CRM: 000000</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="w-full mt-4 text-sm text-slate-400 hover:text-red-400 transition">Sair</button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 overflow-y-auto bg-slate-50 p-8">
+            
+            <!-- SECTION: DASHBOARD -->
+            <section id="sec-dashboard" class="space-y-6">
+                <h2 class="text-3xl font-bold">Resumo Diário</h2>
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <p class="text-slate-500 text-sm">Exames Hoje</p>
+                        <p class="text-3xl font-bold" id="stats-today">0</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <p class="text-slate-500 text-sm">Exames no Histórico</p>
+                        <p class="text-3xl font-bold text-blue-500" id="stats-history">0</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <p class="text-slate-500 text-sm">Precisão Média IA</p>
+                        <p class="text-3xl font-bold text-blue-600">96.8%</p>
+                    </div>
+                
+    </div>
+
+    <div class="grid grid-cols-2 gap-6 mt-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <h3 class="font-bold mb-4">Exames por Dia</h3>
+            <canvas id="examChart"></canvas>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <h3 class="font-bold mb-4">Status dos Exames</h3>
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+            </section>
+
+            <!-- SECTION: NEW EXAM -->
+            <section id="sec-new-exam" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold">Novo Processamento de Imagem</h2>
+                <div id="upload-box" class="bg-white p-10 rounded-2xl shadow-sm border-2 border-dashed border-slate-200 text-center space-y-4">
+                    <div class="mx-auto w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center">
+                        <i class="fas fa-upload text-blue-500 text-2xl"></i>
+                    </div>
+                    <div>
+                        <input type="text" id="patient-name" placeholder="Nome do Paciente" class="mb-2 p-2 border rounded w-64 outline-none focus:ring-2 focus:ring-blue-500"><br>
+                        <input type="file" id="file-input" class="hidden" accept="image/*" onchange="startAnalysis()">
+                        <button onclick="document.getElementById('file-input').click()" class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold hover:shadow-lg transition">Selecionar Radiografia</button>
+                    </div>
+                </div>
+
+                <div id="ai-loading" class="hidden bg-white p-20 rounded-2xl shadow-sm text-center">
+                    <div class="flex justify-center mb-6"><div class="w-24 h-24 rounded-full border-4 border-slate-100 border-t-blue-600 animate-spin"></div></div>
+                    <h3 class="text-xl font-bold mb-2">IA processando imagem...</h3>
+                    <div class="w-64 bg-slate-100 h-2 mx-auto rounded-full overflow-hidden">
+                        <div id="ai-progress" class="bg-blue-600 h-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="ai-result" class="hidden grid grid-cols-12 gap-8">
+                    <div class="col-span-8 bg-slate-900 rounded-3xl overflow-hidden relative flex items-center justify-center">
+                        <img id="exam-img-preview" src="" class="max-w-full max-h-[600px] object-contain opacity-90">
+                        <!-- O círculo vermelho foi removido daqui -->
+                    </div>
+
+                    <div class="col-span-4 space-y-6">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <h4 class="font-bold text-slate-800 mb-4">Laudo Sugerido pela IA</h4>
+                            <textarea id="laudo-text" class="w-full bg-slate-50 p-4 rounded-xl text-sm text-slate-700 h-48 leading-relaxed border-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            
+<div class="grid grid-cols-2 gap-3 mt-4">
+<button onclick="finalizeExam('Aprovado')" class="bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700">Aprovar</button>
+<button onclick="showRejectBox()" class="bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700">Rejeitar</button>
+</div>
+
+<div id="reject-box" class="hidden mt-4">
+<label class="block text-sm font-semibold mb-2">Motivo da rejeição</label>
+<textarea id="reject-reason" class="w-full p-3 border rounded-xl bg-slate-50" rows="4" placeholder="Digite o motivo da rejeição..."></textarea>
+<button onclick="rejectExam()" class="w-full mt-3 bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700">Confirmar Rejeição</button>
+
+<div class="mt-4">
+<label class="block text-sm font-semibold mb-2">Anotações e Observações</label>
+<textarea id="doctor-notes" class="w-full p-3 border rounded-xl bg-slate-50" rows="5" placeholder="Digite observações adicionais do exame..."></textarea>
+</div>
+</div>
+
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: HISTORY -->
+            <section id="sec-history" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold">Histórico de Exames</h2>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b">
+                            <tr>
+                                <th class="p-4 text-sm font-bold">Data</th>
+                                <th class="p-4 text-sm font-bold">Paciente</th>
+                                <th class="p-4 text-sm font-bold">Status</th>
+                                <th class="p-4 text-sm font-bold">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SECTION: LOGS -->
+            <section id="sec-logs" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold">Logs de Auditoria</h2>
+                <div id="log-container" class="bg-slate-900 rounded-xl p-6 font-mono text-xs text-green-400 h-96 overflow-y-auto"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL DE VISUALIZAÇÃO -->
+    <div id="modal-view" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 id="modal-title" class="text-xl font-bold text-slate-800">Detalhes do Exame</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-8 grid grid-cols-2 gap-8">
+                <div class="bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden">
+                    <img id="modal-img" src="" class="max-w-full h-auto">
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">Paciente</p>
+                        <p id="modal-patient" class="text-lg font-semibold"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">Data do Exame</p>
+                        <p id="modal-date"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">Laudo Final</p>
+                        <div id="modal-laudo" class="p-4 bg-blue-50 rounded-xl text-slate-700 italic border-l-4 border-blue-500"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed bottom-10 right-10 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl translate-y-20 transition-all duration-300 opacity-0 flex items-center gap-3">
+        <i class="fas fa-info-circle text-blue-400"></i>
+        <span id="toast-msg"></span>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let exams = JSON.parse(localStorage.getItem('radia_exams')) || [];
+        let logs = JSON.parse(localStorage.getItem('radia_logs')) || [];
+        let examChart = null;
+        let statusChart = null;
+
+        function handleLogin() {
+            const crm = document.getElementById('crm-input').value;
+            const nome = document.getElementById('doctor-name').value;
+
+            if(!nome.trim()) return notify('Informe o nome do médico!');
+            if (crm.length < 4) return notify("CRM inválido!");
+
+            currentUser = { crm: crm, name: nome };
+
+            document.getElementById('user-name').innerText = 'Dr. ' + nome;
+            document.getElementById('user-crm').innerText = 'CRM: ' + crm;
+            document.getElementById('user-avatar').innerText = nome.substring(0,2).toUpperCase();
+
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('hidden');
+            updateDashboard();
+            showSection('dashboard');
+        }
+
+        function showSection(id) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('sec-' + id).classList.remove('hidden');
+            if(id === 'history') loadHistory();
+            if(id === 'logs') loadLogs();
+            if(id === 'dashboard') updateDashboard();
+        }
+
+        function startAnalysis() {
+            const fileInput = document.getElementById('file-input');
+            const patient = document.getElementById('patient-name').value;
+            if(!patient) return notify("Nome do paciente obrigatório!");
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('exam-img-preview').src = e.target.result;
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+
+            document.getElementById('upload-box').classList.add('hidden');
+            document.getElementById('ai-loading').classList.remove('hidden');
+
+            let prog = 0;
+            const interval = setInterval(() => {
+                prog += 5;
+                document.getElementById('ai-progress').style.width = prog + "%";
+                if (prog >= 100) {
+                    clearInterval(interval);
+                    showResult();
+                }
+            }, 50);
+        }
+
+        
+        function showResult() {
+            document.getElementById('ai-loading').classList.add('hidden');
+            document.getElementById('ai-result').classList.remove('hidden');
+
+            const laudos = [
+              "Sem alterações radiográficas evidentes. Não há sinais de fratura ou luxação.",
+              "Achados compatíveis com fratura linear sem desvio significativo. Recomenda-se correlação clínica.",
+              "Possível fissura óssea discreta observada. Sugere-se avaliação ortopédica.",
+              "Redução do espaço articular com sinais sugestivos de processo degenerativo.",
+              "Imagem compatível com pequena fratura cortical. Considerar imobilização conforme avaliação clínica.",
+              "Alinhamento preservado, sem evidências de lesão óssea aguda.",
+              "Opacidade sugestiva de processo inflamatório, recomendando investigação complementar.",
+              "Sinais sugestivos de consolidação óssea em evolução após fratura prévia."
+            ];
+
+            document.getElementById('laudo-text').value =
+                laudos[Math.floor(Math.random()*laudos.length)];
+        }
+
+
+        function finalizeExam(status) {
+            const newExam = {
+                id: Date.now(),
+                date: new Date().toLocaleString('pt-BR'),
+                patient: document.getElementById('patient-name').value,
+                laudo: document.getElementById('laudo-text').value,
+                image: document.getElementById('exam-img-preview').src,
+                status: status
+            };
+            exams.push(newExam);
+            localStorage.setItem('radia_exams', JSON.stringify(exams));
+            logs.push({time:new Date().toLocaleString('pt-BR'),msg:'Exame aprovado: '+newExam.patient});
+localStorage.setItem('radia_logs',JSON.stringify(logs));
+notify("Exame salvo com sucesso!");
+            
+            document.getElementById('ai-result').classList.add('hidden');
+            document.getElementById('upload-box').classList.remove('hidden');
+            document.getElementById('patient-name').value = "";
+            showSection('history');
+        }
+
+        
+function showRejectBox() {
+ document.getElementById('reject-box').classList.remove('hidden');
+}
+
+function rejectExam() {
+ const motivo = document.getElementById('reject-reason').value;
+ if(!motivo.trim()) return notify('Informe o motivo da rejeição!');
+
+ const newExam = {
+   id: Date.now(),
+   date: new Date().toLocaleString('pt-BR'),
+   patient: document.getElementById('patient-name').value,
+   laudo: 'REJEITADO PELO MÉDICO\n\nMotivo:\n' + motivo,
+   image: document.getElementById('exam-img-preview').src,
+   status: 'Rejeitado'
+ };
+
+ exams.push(newExam);
+ localStorage.setItem('radia_exams', JSON.stringify(exams));
+ logs.push({time:new Date().toLocaleString('pt-BR'),msg:'Exame rejeitado: '+newExam.patient+' | Motivo: '+motivo});
+ localStorage.setItem('radia_logs',JSON.stringify(logs));
+ updateDashboard();
+ notify('Diagnóstico rejeitado!');
+ showSection('history');
+}
+
+
+        function loadHistory() {
+            const body = document.getElementById('history-table-body');
+            body.innerHTML = exams.map(ex => `
+                <tr class="border-b hover:bg-slate-50 transition">
+                    <td class="p-4 text-xs">${ex.date}</td>
+                    <td class="p-4 font-semibold">${ex.patient}</td>
+                    <td class="p-4 text-xs"><span class="${ex.status === 'Aprovado' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} px-2 py-1 rounded">${ex.status}</span></td>
+                    <td class="p-4">
+                        <button onclick="viewExam(${ex.id})" class="text-blue-600 hover:text-blue-800 p-2">
+                            <i class="fas fa-eye"></i> Visualizar
+                        </button>
+                    </td>
+                </tr>
+            `).reverse().join('');
+        }
+
+        function viewExam(id) {
+            const exam = exams.find(e => e.id === id);
+            if(!exam) return;
+            document.getElementById('modal-img').src = exam.image;
+            document.getElementById('modal-patient').innerText = exam.patient;
+            document.getElementById('modal-date').innerText = exam.date;
+            document.getElementById('modal-laudo').innerText = exam.laudo;
+            document.getElementById('modal-view').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-view').style.display = 'none';
+        }
+
+        function loadLogs() {
+            const container = document.getElementById('log-container');
+            container.innerHTML = logs.map(l => `<div>[${l.time}] ${l.msg}</div>`).reverse().join('');
+        }
+
+        function notify(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        function updateDashboard() {
+            document.getElementById('stats-today').innerText = exams.length;
+            document.getElementById('stats-history').innerText = exams.length;
+            renderCharts();
+        }
+
+        
+        function renderCharts() {
+
+            const examesPorDia = {};
+
+            exams.forEach(exam => {
+                const data = exam.date.split(' ')[0];
+                examesPorDia[data] = (examesPorDia[data] || 0) + 1;
+            });
+
+            const labels = Object.keys(examesPorDia);
+            const valores = Object.values(examesPorDia);
+
+            if (examChart) examChart.destroy();
+
+            const ctx1 = document.getElementById('examChart');
+
+            if (ctx1) {
+                examChart = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Exames',
+                            data: valores,
+                            backgroundColor: '#2563eb'
+                        }]
+                    }
+                });
+            }
+
+            const aprovados = exams.filter(e => e.status === 'Aprovado').length;
+            const outros = exams.length - aprovados;
+
+            if (statusChart) statusChart.destroy();
+
+            const ctx2 = document.getElementById('statusChart');
+
+            if (ctx2) {
+                statusChart = new Chart(ctx2, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Aprovados', 'Outros'],
+                        datasets: [{
+                            data: [aprovados, outros],
+                            backgroundColor: ['#22c55e', '#f59e0b']
+                        }]
+                    }
+                });
+            }
+        }
+
+
+        function logout() { location.reload(); }
+    </script>
+</body>
+</html>
