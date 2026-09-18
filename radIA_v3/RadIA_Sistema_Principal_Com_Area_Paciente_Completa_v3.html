@@ -14,6 +14,7 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <link
     rel="stylesheet"
@@ -215,6 +216,14 @@
         class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition"
       >
         Acessar Sistema
+      </button>
+
+      <button
+        type="button"
+        onclick="openRegisterModal()"
+        class="w-full border border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold py-3 rounded-lg transition"
+      >
+        Criar nova conta
       </button>
 
 
@@ -1571,11 +1580,112 @@
 
 
 
+
+<!-- =========================================================
+     MODAL — CADASTRO DE USUÁRIO
+========================================================= -->
+<div
+  id="register-modal"
+  class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/70 p-4"
+>
+  <div class="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-800">Criar conta</h2>
+        <p class="text-sm text-slate-500 mt-1">Cadastre o usuário no Supabase Auth.</p>
+      </div>
+      <button
+        type="button"
+        onclick="closeRegisterModal()"
+        class="text-slate-400 hover:text-red-500 text-2xl"
+        aria-label="Fechar"
+      >&times;</button>
+    </div>
+
+    <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Tipo de usuário</label>
+        <select id="register-role" onchange="toggleRegisterFields()" required class="w-full p-3 border rounded-lg">
+          <option value="paciente">Paciente</option>
+          <option value="radiologista">Radiologista</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold mb-1">Nome completo</label>
+        <input id="register-name" required class="w-full p-3 border rounded-lg" placeholder="Nome completo">
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">E-mail</label>
+          <input id="register-email" type="email" required class="w-full p-3 border rounded-lg" placeholder="nome@email.com">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Telefone</label>
+          <input id="register-phone" class="w-full p-3 border rounded-lg" placeholder="(00) 00000-0000">
+        </div>
+      </div>
+
+      <div id="register-patient-fields">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">CPF</label>
+            <input id="register-cpf" inputmode="numeric" maxlength="14" class="w-full p-3 border rounded-lg" placeholder="000.000.000-00">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Convênio</label>
+            <input id="register-insurance" class="w-full p-3 border rounded-lg" placeholder="Nome do convênio">
+          </div>
+        </div>
+      </div>
+
+      <div id="register-radiologist-fields" class="hidden">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">CRM</label>
+            <input id="register-crm" inputmode="numeric" class="w-full p-3 border rounded-lg" placeholder="123456">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Especialidade</label>
+            <input id="register-specialty" class="w-full p-3 border rounded-lg" placeholder="Radiologia">
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Senha</label>
+          <input id="register-password" type="password" minlength="8" required class="w-full p-3 border rounded-lg" placeholder="Mínimo de 8 caracteres">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Confirmar senha</label>
+          <input id="register-password-confirm" type="password" minlength="8" required class="w-full p-3 border rounded-lg" placeholder="Repita a senha">
+        </div>
+      </div>
+
+      <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-slate-700">
+        A senha será tratada pelo Supabase Auth. Ela não será armazenada diretamente em uma tabela criada pelo projeto.
+      </div>
+
+      <button
+        id="register-submit"
+        type="submit"
+        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3 rounded-lg transition"
+      >
+        Criar conta
+      </button>
+    </form>
+  </div>
+</div>
+
 <!-- =========================================================
      SEU JAVASCRIPT ORIGINAL
 ========================================================= -->
 
+<script src="js/supabase-client.js"></script>
 <script src="js/script.js"></script>
+<script src="js/cadastro.js"></script>
 
 
 
