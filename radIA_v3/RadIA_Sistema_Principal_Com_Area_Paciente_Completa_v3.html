@@ -96,13 +96,13 @@
       <div id="professional-login" class="hidden">
 
         <label class="block text-sm font-semibold mb-1">
-          CRM
+          CRM ou e-mail
         </label>
 
         <input
           id="crm-input"
           class="w-full p-3 border rounded-lg"
-          placeholder="123456 ou e-mail"
+          placeholder="123456 ou seu e-mail"
         >
 
         <label class="block text-sm font-semibold mb-1 mt-3">
@@ -117,7 +117,7 @@
         >
 
         <p class="text-xs text-slate-500 mt-2">
-          O administrador também pode entrar nesta versão usando o e-mail e a senha do administrador.
+          O radiologista também pode entrar usando o CRM ou o e-mail cadastrado. O administrador pode usar o e-mail e a senha nas duas interfaces.
         </p>
 
       </div>
@@ -130,13 +130,13 @@
       <div id="patient-login">
 
         <label class="block text-sm font-semibold mb-1">
-          CPF
+          CPF ou e-mail
         </label>
 
         <input
           id="cpf-input"
           class="w-full p-3 border rounded-lg"
-          placeholder="000.000.000-00 ou e-mail"
+          placeholder="000.000.000-00 ou seu e-mail"
         >
 
 
@@ -163,7 +163,7 @@
         >
 
         <p class="text-xs text-slate-500 mt-2">
-          O administrador também pode entrar nesta versão usando o e-mail no campo CPF e a senha do administrador.
+          O paciente pode entrar usando o CPF ou o e-mail cadastrado. O administrador pode usar o e-mail e a senha nas duas interfaces.
         </p>
 
 
@@ -2139,6 +2139,13 @@ window.markPatientNotificationsRead=function(){if(state?.notifications){state.no
 document.addEventListener('DOMContentLoaded',()=>{syncDashboard();renderPatientArea();const modal=$('enhanced-exam-modal');modal?.addEventListener('click',e=>{if(e.target===modal)closeEnhancedExamModal()});});
 })();
 </script>
+
+
+<!-- =========================================================
+     MÓDULOS JAVASCRIPT
+========================================================= -->
+<script src="js/supabase-client.js"></script>
+<script src="js/script.js"></script>
 
 </body>
 </html>

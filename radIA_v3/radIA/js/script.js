@@ -21,60 +21,133 @@ function notify(msg) {
   toast.classList.remove('translate-y-20','opacity-0');
   setTimeout(()=>toast.classList.add('translate-y-20','opacity-0'),3000);
 }
-function toggleLoginFields() {
-  const patient=document.getElementById('user-type').value==='paciente';
-  document.getElementById('patient-login').classList.toggle('hidden',!patient);
-  document.getElementById('professional-login').classList.toggle('hidden',patient);
+function clearLoginFieldError(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  input.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+  input.removeAttribute('aria-invalid');
+
+  const error = document.getElementById(`${inputId}-error`);
+  if (error) error.remove();
 }
+
+function setLoginFieldError(inputId, message) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  clearLoginFieldError(inputId);
+  input.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+  input.setAttribute('aria-invalid', 'true');
+
+  const error = document.createElement('p');
+  error.id = `${inputId}-error`;
+  error.className = 'text-xs text-red-600 mt-1';
+  error.innerHTML = `<i class="fas fa-exclamation-circle mr-1"></i>${esc(message)}`;
+  input.insertAdjacentElement('afterend', error);
+}
+
+function clearLoginErrors() {
+  ['cpf-input', 'insurance-input', 'patient-password-input', 'crm-input', 'password-input']
+    .forEach(clearLoginFieldError);
+}
+
+function showLoginValidation(message) {
+  notify(message);
+}
+
+function setupLoginValidation() {
+  ['cpf-input', 'insurance-input', 'patient-password-input', 'crm-input', 'password-input']
+    .forEach(id => {
+      const input = document.getElementById(id);
+      if (!input || input.dataset.loginValidationReady) return;
+      input.dataset.loginValidationReady = 'true';
+      input.addEventListener('input', () => clearLoginFieldError(id));
+    });
+}
+
+function toggleLoginFields() {
+  const patient = document.getElementById('user-type').value === 'paciente';
+  document.getElementById('patient-login').classList.toggle('hidden', !patient);
+  document.getElementById('professional-login').classList.toggle('hidden', patient);
+  clearLoginErrors();
+}
+
 // REQ-AUTENTICAÇÃO: login real usando Supabase Auth.
-// O Supabase Auth autentica por e-mail + senha. Para manter a interface atual,
-// pacientes entram com CPF + convênio + senha e radiologistas com CRM + senha;
-// uma função SQL segura converte CPF/CRM em e-mail antes do signInWithPassword.
+// Paciente: CPF ou e-mail + convênio + senha.
+// Radiologista: CRM ou e-mail + senha.
+// Administrador: e-mail + senha e pode escolher qualquer uma das duas interfaces.
 async function handleLogin() {
   if (!window.radiaSupabase) {
     return notify('Supabase não está configurado. Preencha a URL e a chave no arquivo js/supabase-client.js.');
   }
 
+  clearLoginErrors();
+  setupLoginValidation();
+
   const accessType = document.getElementById('user-type').value;
   const isPatientAccess = accessType === 'paciente';
-  const credentialInput = document.getElementById(isPatientAccess ? 'cpf-input' : 'crm-input');
+  const credentialId = isPatientAccess ? 'cpf-input' : 'crm-input';
+  const passwordId = isPatientAccess ? 'patient-password-input' : 'password-input';
+  const credentialInput = document.getElementById(credentialId);
   const credentialRaw = credentialInput?.value.trim() || '';
-  const password = document.getElementById(isPatientAccess ? 'patient-password-input' : 'password-input')?.value || '';
+  const password = document.getElementById(passwordId)?.value || '';
   const insurance = document.getElementById('insurance-input')?.value.trim() || '';
+  const isEmail = credentialRaw.includes('@');
 
-  // Bloqueia campos obrigatórios antes de qualquer chamada ao Supabase.
+  let hasError = false;
+
   if (!credentialRaw) {
-    return notify(isPatientAccess ? 'Informe o CPF.' : 'Informe o CRM.');
+    setLoginFieldError(credentialId, isPatientAccess
+      ? 'Informe o CPF ou o e-mail.'
+      : 'Informe o CRM ou o e-mail.');
+    hasError = true;
+  } else if (isEmail) {
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(credentialRaw);
+    if (!emailOk) {
+      setLoginFieldError(credentialId, 'Informe um e-mail válido.');
+      hasError = true;
+    }
   }
 
   if (!password) {
-    return notify('Informe a senha.');
+    setLoginFieldError(passwordId, 'Informe a senha.');
+    hasError = true;
+  } else if (password.length < 6) {
+    setLoginFieldError(passwordId, 'A senha deve ter pelo menos 6 caracteres.');
+    hasError = true;
   }
 
-  if (password.length < 6) {
-    return notify('A senha deve ter pelo menos 6 caracteres.');
+  // Para paciente, o convênio continua sendo conferido no cadastro.
+  // Ele fica opcional apenas nesta primeira validação quando o identificador
+  // é um e-mail, pois o administrador também entra pela interface de paciente.
+  if (isPatientAccess && !isEmail && !insurance) {
+    setLoginFieldError('insurance-input', 'Informe o convênio.');
+    hasError = true;
   }
 
-  if (isPatientAccess && !credentialRaw.includes('@') && !insurance) {
-    return notify('Informe o convênio.');
+  if (hasError) {
+    return showLoginValidation('Preencha corretamente os campos destacados.');
   }
 
   let email = credentialRaw.toLowerCase();
-  const adminLogin = credentialRaw.includes('@');
+  const adminLogin = isEmail;
 
   try {
-    // Administrador: pode usar o e-mail nas duas versões de acesso.
-    // Usuário comum: o CPF/CRM é convertido em e-mail pela função SQL.
+    // Usuários comuns podem entrar pelo CPF/CRM. A função SQL converte
+    // o identificador em e-mail sem expor auth.users ao navegador.
     if (!adminLogin) {
       const identifier = credentialRaw.replace(/\D/g, '');
       const functionType = isPatientAccess ? 'paciente' : 'radiologista';
 
       if (isPatientAccess && identifier.length !== 11) {
-        return notify('Informe um CPF válido com 11 dígitos.');
+        setLoginFieldError(credentialId, 'Informe um CPF válido com 11 dígitos.');
+        return showLoginValidation('Corrija o CPF destacado.');
       }
 
       if (!isPatientAccess && identifier.length < 4) {
-        return notify('Informe um CRM válido.');
+        setLoginFieldError(credentialId, 'Informe um CRM válido.');
+        return showLoginValidation('Corrija o CRM destacado.');
       }
 
       const { data: lookup, error: lookupError } = await window.radiaSupabase
@@ -90,7 +163,10 @@ async function handleLogin() {
 
       email = lookup || '';
       if (!email) {
-        return notify(isPatientAccess
+        setLoginFieldError(credentialId, isPatientAccess
+          ? 'CPF não encontrado no cadastro.'
+          : 'CRM não encontrado no cadastro.');
+        return showLoginValidation(isPatientAccess
           ? 'CPF não encontrado no cadastro.'
           : 'CRM não encontrado no cadastro.');
       }
@@ -103,7 +179,8 @@ async function handleLogin() {
 
     if (error) {
       console.error('Erro no login:', error);
-      return notify('Usuário ou senha inválidos.');
+      setLoginFieldError(passwordId, 'Senha incorreta ou usuário não autorizado.');
+      return notify('Não foi possível entrar. Verifique o e-mail/CPF/CRM e a senha.');
     }
 
     // Descobre o papel real do usuário no banco.
@@ -119,14 +196,22 @@ async function handleLogin() {
       return notify('Usuário autenticado, mas o perfil não foi encontrado no banco.');
     }
 
-    // O administrador pode escolher qualquer uma das duas interfaces.
+    // Administrador pode entrar pela interface de paciente ou de radiologista.
     if (perfil.tipo !== 'administrador' && perfil.tipo !== accessType) {
       await window.radiaSupabase.auth.signOut();
       return notify(`Este usuário é cadastrado como ${perfil.tipo} e não pode entrar como ${accessType}.`);
     }
 
-    // Para paciente comum, confere o convênio informado com o cadastro.
+    // Paciente comum precisa informar um convênio que corresponda ao cadastro.
+    // Administrador não possui convênio e, por isso, pode acessar a interface
+    // de paciente sem preencher esse campo.
     if (perfil.tipo === 'paciente') {
+      if (!insurance) {
+        await window.radiaSupabase.auth.signOut();
+        setLoginFieldError('insurance-input', 'Informe o convênio.');
+        return showLoginValidation('Informe o convênio para entrar como paciente.');
+      }
+
       const { data: paciente, error: pacienteError } = await window.radiaSupabase
         .from('pacientes')
         .select('cpf, convenio')
@@ -140,7 +225,8 @@ async function handleLogin() {
 
       if (paciente.convenio?.trim().toLowerCase() !== insurance.toLowerCase()) {
         await window.radiaSupabase.auth.signOut();
-        return notify('O convênio informado não corresponde ao cadastro.');
+        setLoginFieldError('insurance-input', 'O convênio não corresponde ao cadastro.');
+        return showLoginValidation('O convênio informado não corresponde ao cadastro.');
       }
     }
 
@@ -148,7 +234,7 @@ async function handleLogin() {
       type: accessType,
       actualRole: perfil.tipo,
       name: perfil.nome_completo || (isPatientAccess ? 'Paciente' : 'Radiologista'),
-      identifier: adminLogin ? data.user.email : credentialRaw,
+      identifier: isEmail ? data.user.email : credentialRaw,
       id: data.user.id,
       email: data.user.email
     };
