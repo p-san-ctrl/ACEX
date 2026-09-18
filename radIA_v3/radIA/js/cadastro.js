@@ -1,7 +1,7 @@
 /*
  * RadIA — Cadastro de usuários
  * Usa Supabase Auth para credenciais e o trigger do banco para criar
- * automaticamente os registros em profiles/patients/radiologists.
+ * automaticamente os registros em perfis/pacientes/radiologistas.
  */
 
 function onlyDigits(value = '') {
@@ -60,9 +60,9 @@ async function handleRegister(event) {
   }
 
   const metadata = {
-    role,
-    full_name: name,
-    phone
+    tipo: role,
+    nome_completo: name,
+    telefone: phone
   };
 
   if (role === 'paciente') {
@@ -80,7 +80,7 @@ async function handleRegister(event) {
     }
 
     metadata.cpf = cpf;
-    metadata.insurance = insurance;
+    metadata.convenio = insurance;
   } else {
     const crm = onlyDigits(document.getElementById('register-crm').value);
     const specialty = document.getElementById('register-specialty').value.trim();
@@ -91,7 +91,7 @@ async function handleRegister(event) {
     }
 
     metadata.crm = crm;
-    metadata.specialty = specialty || 'Radiologia';
+    metadata.especialidade = specialty || 'Radiologia';
   }
 
   const button = document.getElementById('register-submit');

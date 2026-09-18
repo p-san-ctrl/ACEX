@@ -2,6 +2,7 @@
 // NOTA: em produção, a versão deve ser controlada no backend para garantir integridade e rastreabilidade.
 const CONSENT_VERSION = 'LGPD-2026.08';
 let currentUser = null;
+window.radiaCurrentUser = null;
 let currentExam = null;
 // REQ-HISTÓRICO: protótipo usa localStorage para persistir exames.
 // IMPORTANTE: localStorage NÃO é adequado para dados médicos em produção; usar backend + banco seguro.
@@ -25,38 +26,157 @@ function toggleLoginFields() {
   document.getElementById('patient-login').classList.toggle('hidden',!patient);
   document.getElementById('professional-login').classList.toggle('hidden',patient);
 }
-// REQ-AUTENTICAÇÃO: demonstra o fluxo de acesso por perfil.
-// IMPORTANTE: esta autenticação é apenas prototípica; senha/CRM/CPF devem ser validados no servidor em produção.
-function handleLogin() {
-  const type=document.getElementById('user-type').value;
-  if(type==='paciente') {
-    const cpf=document.getElementById('cpf-input').value.replace(/\D/g,'');
-    const insurance=document.getElementById('insurance-input').value.trim();
-    if(cpf.length!==11) return notify('Informe um CPF válido.');
-    if(!insurance) return notify('Informe o convênio.');
-    currentUser={type, name:'Paciente', identifier:cpf};
-  } else {
-    const crm=document.getElementById('crm-input').value.replace(/\D/g,'');
-    const password=document.getElementById('password-input').value;
-    if(crm.length<4) return notify('Informe um CRM válido.');
-    if(password.length<6) return notify('A senha deve ter pelo menos 6 caracteres.');
-    currentUser={type, name:type.charAt(0).toUpperCase()+type.slice(1), identifier:crm};
+// REQ-AUTENTICAÇÃO: login real usando Supabase Auth.
+// O Supabase Auth autentica por e-mail + senha. Para manter a interface atual,
+// pacientes entram com CPF + convênio + senha e radiologistas com CRM + senha;
+// uma função SQL segura converte CPF/CRM em e-mail antes do signInWithPassword.
+async function handleLogin() {
+  if (!window.radiaSupabase) {
+    return notify('Supabase não está configurado. Preencha a URL e a chave no arquivo js/supabase-client.js.');
   }
-  document.getElementById('user-name').innerText=currentUser.name;
-  document.getElementById('user-role').innerText=currentUser.type+' • '+currentUser.identifier;
-  document.getElementById('user-avatar').innerText=currentUser.name.slice(0,2).toUpperCase();
-  document.getElementById('login-page').classList.add('hidden');
-  document.getElementById('app-shell').classList.remove('hidden');
-  document.getElementById('nav-patient').classList.toggle('hidden', currentUser.type !== 'paciente');
-  document.getElementById('nav-radiologist').classList.toggle('hidden', currentUser.type !== 'radiologista');
-  addLog('Login realizado: '+currentUser.type);
-  if(currentUser.type==='paciente') {
-    showSection('patient-consent');
-  } else {
-    updateDashboard();
-    showSection('dashboard');
+
+  const accessType = document.getElementById('user-type').value;
+  const isPatientAccess = accessType === 'paciente';
+  const credentialInput = document.getElementById(isPatientAccess ? 'cpf-input' : 'crm-input');
+  const credentialRaw = credentialInput?.value.trim() || '';
+  const password = document.getElementById(isPatientAccess ? 'patient-password-input' : 'password-input')?.value || '';
+  const insurance = document.getElementById('insurance-input')?.value.trim() || '';
+
+  // Bloqueia campos obrigatórios antes de qualquer chamada ao Supabase.
+  if (!credentialRaw) {
+    return notify(isPatientAccess ? 'Informe o CPF.' : 'Informe o CRM.');
+  }
+
+  if (!password) {
+    return notify('Informe a senha.');
+  }
+
+  if (password.length < 6) {
+    return notify('A senha deve ter pelo menos 6 caracteres.');
+  }
+
+  if (isPatientAccess && !credentialRaw.includes('@') && !insurance) {
+    return notify('Informe o convênio.');
+  }
+
+  let email = credentialRaw.toLowerCase();
+  const adminLogin = credentialRaw.includes('@');
+
+  try {
+    // Administrador: pode usar o e-mail nas duas versões de acesso.
+    // Usuário comum: o CPF/CRM é convertido em e-mail pela função SQL.
+    if (!adminLogin) {
+      const identifier = credentialRaw.replace(/\D/g, '');
+      const functionType = isPatientAccess ? 'paciente' : 'radiologista';
+
+      if (isPatientAccess && identifier.length !== 11) {
+        return notify('Informe um CPF válido com 11 dígitos.');
+      }
+
+      if (!isPatientAccess && identifier.length < 4) {
+        return notify('Informe um CRM válido.');
+      }
+
+      const { data: lookup, error: lookupError } = await window.radiaSupabase
+        .rpc('obter_email_login', {
+          p_tipo: functionType,
+          p_identificador: identifier
+        });
+
+      if (lookupError) {
+        console.error('Erro ao localizar usuário:', lookupError);
+        return notify('Não foi possível consultar o cadastro no banco. Verifique se o SQL de login foi executado.');
+      }
+
+      email = lookup || '';
+      if (!email) {
+        return notify(isPatientAccess
+          ? 'CPF não encontrado no cadastro.'
+          : 'CRM não encontrado no cadastro.');
+      }
+    }
+
+    const { data, error } = await window.radiaSupabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      console.error('Erro no login:', error);
+      return notify('Usuário ou senha inválidos.');
+    }
+
+    // Descobre o papel real do usuário no banco.
+    const { data: perfil, error: perfilError } = await window.radiaSupabase
+      .from('perfis')
+      .select('id, tipo, nome_completo, telefone')
+      .eq('id', data.user.id)
+      .single();
+
+    if (perfilError || !perfil) {
+      await window.radiaSupabase.auth.signOut();
+      console.error('Erro ao carregar perfil:', perfilError);
+      return notify('Usuário autenticado, mas o perfil não foi encontrado no banco.');
+    }
+
+    // O administrador pode escolher qualquer uma das duas interfaces.
+    if (perfil.tipo !== 'administrador' && perfil.tipo !== accessType) {
+      await window.radiaSupabase.auth.signOut();
+      return notify(`Este usuário é cadastrado como ${perfil.tipo} e não pode entrar como ${accessType}.`);
+    }
+
+    // Para paciente comum, confere o convênio informado com o cadastro.
+    if (perfil.tipo === 'paciente') {
+      const { data: paciente, error: pacienteError } = await window.radiaSupabase
+        .from('pacientes')
+        .select('cpf, convenio')
+        .eq('id', data.user.id)
+        .single();
+
+      if (pacienteError || !paciente) {
+        await window.radiaSupabase.auth.signOut();
+        return notify('Cadastro de paciente não encontrado.');
+      }
+
+      if (paciente.convenio?.trim().toLowerCase() !== insurance.toLowerCase()) {
+        await window.radiaSupabase.auth.signOut();
+        return notify('O convênio informado não corresponde ao cadastro.');
+      }
+    }
+
+    currentUser = {
+      type: accessType,
+      actualRole: perfil.tipo,
+      name: perfil.nome_completo || (isPatientAccess ? 'Paciente' : 'Radiologista'),
+      identifier: adminLogin ? data.user.email : credentialRaw,
+      id: data.user.id,
+      email: data.user.email
+    };
+    window.radiaCurrentUser = currentUser;
+
+    document.getElementById('user-name').innerText = currentUser.name;
+    document.getElementById('user-role').innerText = currentUser.actualRole === 'administrador'
+      ? `${currentUser.type} • administrador • ${currentUser.identifier}`
+      : currentUser.type + ' • ' + currentUser.identifier;
+    document.getElementById('user-avatar').innerText = currentUser.name.slice(0, 2).toUpperCase();
+    document.getElementById('login-page').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.getElementById('nav-patient').classList.toggle('hidden', currentUser.type !== 'paciente');
+    document.getElementById('nav-radiologist').classList.toggle('hidden', currentUser.type !== 'radiologista');
+    addLog('Login realizado: ' + currentUser.type + (currentUser.actualRole === 'administrador' ? ' (administrador)' : ''));
+
+    if (currentUser.type === 'paciente') {
+      showSection('patient-consent');
+    } else {
+      updateDashboard();
+      showSection('dashboard');
+    }
+  } catch (error) {
+    console.error('Erro inesperado no login:', error);
+    return notify('Não foi possível concluir o login. Tente novamente.');
   }
 }
+
 function showSection(id) {
   if(currentUser?.type==='paciente' && !['patient-consent','patient-feedback'].includes(id)) return;
   if(currentUser?.type==='radiologista' && ['patient-consent','patient-feedback'].includes(id)) return;
@@ -238,6 +358,11 @@ function renderCharts(){
   if(statusChart)statusChart.destroy();
   statusChart=new Chart(document.getElementById('statusChart'),{type:'doughnut',data:{labels:['Aprovados','Rejeitados'],datasets:[{data:[exams.filter(e=>e.status==='Aprovado').length,exams.filter(e=>e.status==='Rejeitado').length]}]}});
 }
-function logout(){ location.reload(); }
+async function logout(){
+  if (window.radiaSupabase) {
+    await window.radiaSupabase.auth.signOut();
+  }
+  location.reload();
+}
 document.getElementById('exam-date').value=new Date().toISOString().slice(0,10);
 toggleLoginFields();

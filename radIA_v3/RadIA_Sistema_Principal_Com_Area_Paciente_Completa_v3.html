@@ -101,9 +101,8 @@
 
         <input
           id="crm-input"
-          inputmode="numeric"
           class="w-full p-3 border rounded-lg"
-          placeholder="123456"
+          placeholder="123456 ou e-mail do administrador"
         >
 
         <label class="block text-sm font-semibold mb-1 mt-3">
@@ -116,6 +115,10 @@
           class="w-full p-3 border rounded-lg"
           placeholder="Senha"
         >
+
+        <p class="text-xs text-slate-500 mt-2">
+          O administrador também pode entrar nesta versão usando o e-mail e a senha do administrador.
+        </p>
 
       </div>
 
@@ -132,10 +135,8 @@
 
         <input
           id="cpf-input"
-          inputmode="numeric"
-          maxlength="14"
           class="w-full p-3 border rounded-lg"
-          placeholder="000.000.000-00"
+          placeholder="000.000.000-00 ou e-mail do administrador"
         >
 
 
@@ -148,6 +149,22 @@
           class="w-full p-3 border rounded-lg"
           placeholder="Nome do convênio"
         >
+
+        <label class="block text-sm font-semibold mb-1 mt-3">
+          Senha
+        </label>
+
+        <input
+          id="patient-password-input"
+          type="password"
+          minlength="6"
+          class="w-full p-3 border rounded-lg"
+          placeholder="Senha"
+        >
+
+        <p class="text-xs text-slate-500 mt-2">
+          O administrador também pode entrar nesta versão usando o e-mail no campo CPF e a senha do administrador.
+        </p>
 
 
         <!-- =================================================
@@ -218,21 +235,14 @@
         Acessar Sistema
       </button>
 
-      <button
-        type="button"
-        onclick="openRegisterModal()"
-        class="w-full border border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold py-3 rounded-lg transition"
-      >
-        Criar nova conta
-      </button>
+      
 
 
       <!-- AVISO -->
 
       <p class="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
 
-        Protótipo acadêmico: a autenticação real deve ser implementada
-        no servidor com armazenamento seguro de credenciais.
+        A autenticação é feita pelo Supabase Auth. Nunca coloque a chave secreta do Supabase neste arquivo.
 
       </p>
 
@@ -1581,111 +1591,7 @@
 
 
 
-<!-- =========================================================
-     MODAL — CADASTRO DE USUÁRIO
-========================================================= -->
-<div
-  id="register-modal"
-  class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/70 p-4"
->
-  <div class="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h2 class="text-2xl font-bold text-slate-800">Criar conta</h2>
-        <p class="text-sm text-slate-500 mt-1">Cadastre o usuário no Supabase Auth.</p>
-      </div>
-      <button
-        type="button"
-        onclick="closeRegisterModal()"
-        class="text-slate-400 hover:text-red-500 text-2xl"
-        aria-label="Fechar"
-      >&times;</button>
-    </div>
 
-    <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4">
-      <div>
-        <label class="block text-sm font-semibold mb-1">Tipo de usuário</label>
-        <select id="register-role" onchange="toggleRegisterFields()" required class="w-full p-3 border rounded-lg">
-          <option value="paciente">Paciente</option>
-          <option value="radiologista">Radiologista</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-sm font-semibold mb-1">Nome completo</label>
-        <input id="register-name" required class="w-full p-3 border rounded-lg" placeholder="Nome completo">
-      </div>
-
-      <div class="grid md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-semibold mb-1">E-mail</label>
-          <input id="register-email" type="email" required class="w-full p-3 border rounded-lg" placeholder="nome@email.com">
-        </div>
-        <div>
-          <label class="block text-sm font-semibold mb-1">Telefone</label>
-          <input id="register-phone" class="w-full p-3 border rounded-lg" placeholder="(00) 00000-0000">
-        </div>
-      </div>
-
-      <div id="register-patient-fields">
-        <div class="grid md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold mb-1">CPF</label>
-            <input id="register-cpf" inputmode="numeric" maxlength="14" class="w-full p-3 border rounded-lg" placeholder="000.000.000-00">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Convênio</label>
-            <input id="register-insurance" class="w-full p-3 border rounded-lg" placeholder="Nome do convênio">
-          </div>
-        </div>
-      </div>
-
-      <div id="register-radiologist-fields" class="hidden">
-        <div class="grid md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold mb-1">CRM</label>
-            <input id="register-crm" inputmode="numeric" class="w-full p-3 border rounded-lg" placeholder="123456">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Especialidade</label>
-            <input id="register-specialty" class="w-full p-3 border rounded-lg" placeholder="Radiologia">
-          </div>
-        </div>
-      </div>
-
-      <div class="grid md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-semibold mb-1">Senha</label>
-          <input id="register-password" type="password" minlength="8" required class="w-full p-3 border rounded-lg" placeholder="Mínimo de 8 caracteres">
-        </div>
-        <div>
-          <label class="block text-sm font-semibold mb-1">Confirmar senha</label>
-          <input id="register-password-confirm" type="password" minlength="8" required class="w-full p-3 border rounded-lg" placeholder="Repita a senha">
-        </div>
-      </div>
-
-      <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-slate-700">
-        A senha será tratada pelo Supabase Auth. Ela não será armazenada diretamente em uma tabela criada pelo projeto.
-      </div>
-
-      <button
-        id="register-submit"
-        type="submit"
-        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3 rounded-lg transition"
-      >
-        Criar conta
-      </button>
-    </form>
-  </div>
-</div>
-
-<!-- =========================================================
-     SEU JAVASCRIPT ORIGINAL
-========================================================= -->
-
-<script src="js/supabase-client.js"></script>
-<script src="js/script.js"></script>
-<script src="js/cadastro.js"></script>
 
 
 
@@ -1710,6 +1616,13 @@ function validatePatientLGPD() {
   */
 
   if (userType !== 'paciente') {
+    return true;
+  }
+
+  // O administrador pode acessar a versão de paciente sem precisar
+  // aceitar o termo como se fosse um paciente real.
+  const cpfOuEmail = document.getElementById('cpf-input')?.value.trim() || '';
+  if (cpfOuEmail.includes('@')) {
     return true;
   }
 
@@ -1779,121 +1692,6 @@ function validatePatientLGPD() {
   return true;
 
 }
-
-
-
-/* =========================================================
-   INTERCEPTA O LOGIN ORIGINAL
-========================================================= */
-
-/*
-  Guarda a função original do seu script.js.
-*/
-
-const originalLoginFunction =
-  window.handleLogin;
-
-
-/*
-  Cria uma nova função de login.
-
-  Primeiro verifica a LGPD.
-  Depois executa o login original.
-*/
-
-window.handleLogin = function() {
-
-
-  /*
-    BLOQUEIA o login se paciente não aceitar.
-  */
-
-  if (!validatePatientLGPD()) {
-    return;
-  }
-
-
-  /*
-    Se o seu script.js já tiver handleLogin,
-    executa a função original.
-  */
-
-  if (
-    typeof originalLoginFunction === 'function'
-  ) {
-
-    return originalLoginFunction.apply(
-      this,
-      arguments
-    );
-
-  }
-
-
-  /*
-    Fallback para demonstração caso
-    não exista handleLogin no script.js.
-  */
-
-  const userType =
-    document.getElementById('user-type').value;
-
-
-  document
-    .getElementById('login-page')
-    .classList.add('hidden');
-
-
-  document
-    .getElementById('app-shell')
-    .classList.remove('hidden');
-
-
-  if (userType === 'paciente') {
-
-    document
-      .getElementById('nav-patient')
-      .classList.remove('hidden');
-
-    document
-      .getElementById('nav-radiologist')
-      .classList.add('hidden');
-
-
-    if (
-      typeof showSection === 'function'
-    ) {
-
-      showSection(
-        'patient-dashboard'
-      );
-
-    }
-
-  } else {
-
-    document
-      .getElementById('nav-patient')
-      .classList.add('hidden');
-
-    document
-      .getElementById('nav-radiologist')
-      .classList.remove('hidden');
-
-
-    if (
-      typeof showSection === 'function'
-    ) {
-
-      showSection(
-        'dashboard'
-      );
-
-    }
-
-  }
-
-};
 
 
 
