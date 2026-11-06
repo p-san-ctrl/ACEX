@@ -34,6 +34,8 @@ Aplique `supabase/migrations/20261106013404_add_fracture_ai_workflow.sql`. A mig
 
 Se o restante da migração já estiver aplicado e a interface mostrar `Bucket not found`, execute apenas `supabase/configurar_storage.sql` no SQL Editor. O script é idempotente, mantém o bucket privado, limita os arquivos a 10 MB e aceita somente PNG/JPEG.
 
+Se a fila mostrar que `analises_ia.erro_mensagem` não existe, execute `supabase/configurar_backend_ia.sql`. Esse complemento adiciona somente as colunas e índices usados pelas Edge Functions e preserva os exames existentes.
+
 O arquivo `supabase/schema.sql` é histórico e não corresponde ao banco atual; não o aplique.
 
 O Security Advisor também aponta que `obter_email_login` é uma função `SECURITY DEFINER` acessível antes do login. Ela é necessária ao fluxo legado CPF/CRM → e-mail, mas permite enumeração de identificadores e deve ser substituída por login direto por e-mail ou por um endpoint com rate limit/CAPTCHA antes de uso real. A proteção contra senhas vazadas deve ser ativada no painel do Supabase Auth.
@@ -58,8 +60,8 @@ Variáveis opcionais: `CONFIDENCE_THRESHOLD` (padrão `0.25`), `IOU_THRESHOLD` (
 supabase secrets set \
   AI_INFERENCE_URL='https://seu-servico-de-inferencia' \
   AI_INFERENCE_TOKEN='o-mesmo-segredo'
-supabase functions deploy analisar-exame
-supabase functions deploy revisar-exame
+supabase functions deploy analisar-exame --project-ref bdlttuikdwzprpalolqo
+supabase functions deploy revisar-exame --project-ref bdlttuikdwzprpalolqo
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`/`SUPABASE_PUBLISHABLE_KEYS` e `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_SECRET_KEYS` são fornecidas pelo Supabase. Nunca coloque chaves secretas no navegador.

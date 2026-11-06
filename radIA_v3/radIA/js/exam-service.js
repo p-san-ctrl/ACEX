@@ -22,6 +22,9 @@
 
   function unwrapFunctionError(error, fallback) {
     const message = error?.context?.body?.error || error?.message;
+    if (error?.name === 'FunctionsFetchError' || /failed to send a request/i.test(message || '')) {
+      return new Error('O serviço de análise ainda não está publicado no Supabase. Contate o administrador do RadIA.');
+    }
     return new Error(message || fallback);
   }
 
@@ -118,13 +121,26 @@
   }
 
   async function latestAnalysis(examId) {
-    const { data: analysis, error } = await client()
+    let { data: analysis, error } = await client()
       .from('analises_ia')
       .select('id, exame_id, nome_modelo, versao_modelo, status, erro_mensagem, resposta_bruta, iniciado_em, concluido_em, criado_em')
       .eq('exame_id', examId)
       .order('criado_em', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // Compatibilidade temporária com instalações anteriores à coluna
+    // erro_mensagem. A migração continua necessária para executar a IA.
+    if (error?.code === '42703' && /erro_mensagem/.test(error.message || '')) {
+      ({ data: analysis, error } = await client()
+        .from('analises_ia')
+        .select('id, exame_id, nome_modelo, versao_modelo, status, resposta_bruta, iniciado_em, concluido_em, criado_em')
+        .eq('exame_id', examId)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+        .maybeSingle());
+      if (analysis) analysis.erro_mensagem = null;
+    }
     if (error) throw error;
     if (!analysis) return null;
 
