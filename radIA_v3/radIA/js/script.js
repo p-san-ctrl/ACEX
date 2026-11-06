@@ -587,9 +587,11 @@ async function updateDashboard() {
   try {
     const exams = await window.RadiaExamService.listExams();
     const today = new Date().toISOString().slice(0, 10);
+    const queue = exams.filter(exam => exam.status !== 'concluido');
     document.getElementById('stats-today').textContent = exams.filter(exam => exam.data_exame === today).length;
-    document.getElementById('stats-history').textContent = exams.length;
-    document.getElementById('stats-pending').textContent = exams.filter(exam => !['concluido', 'rejeitado'].includes(exam.status)).length;
+    document.getElementById('stats-history').textContent = queue.length;
+    document.getElementById('stats-pending').textContent = queue.filter(exam => exam.status === 'em_analise').length;
+    document.getElementById('stats-urgent').textContent = queue.filter(exam => String(exam.prioridade || '').toLowerCase() === 'urgente').length;
     renderCharts(exams);
   } catch (error) {
     console.error('Falha ao atualizar painel:', error);

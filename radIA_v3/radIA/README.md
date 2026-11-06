@@ -24,7 +24,7 @@ O modelo foi preferido a uma API de visão genérica porque foi treinado especif
 7. O frontend exibe a imagem original, as caixas proporcionais, confiança, modelo e status. As caixas podem ser ocultadas.
 8. A Edge Function `revisar-exame` registra a decisão profissional em `laudos`, atualiza `exames` e audita o evento.
 
-Imagens e laudos não são gravados em `localStorage`. O antigo protótipo local permanece marcado como script inerte em `RadIA.html` para referência e não é executado.
+Imagens, fila e laudos não são gravados em `localStorage`: a fila de pacientes, o atendimento e a auditoria usam os serviços autenticados do Supabase. O arquivo `radIA26-10.html` permanece apenas como referência histórica do protótipo visual e funcional.
 
 ## Configuração
 
