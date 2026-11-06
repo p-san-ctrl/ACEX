@@ -55,6 +55,7 @@ function setupLoginValidation() {
     const input = document.getElementById(id);
     if (!input || input.dataset.loginValidationReady) return;
     input.dataset.loginValidationReady = 'true';
+    if (id === 'cpf-input') return;
     input.addEventListener('input', () => clearLoginFieldError(id));
   });
 }
@@ -86,6 +87,9 @@ async function handleLogin() {
     invalid = true;
   } else if (emailLogin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(credential)) {
     setLoginFieldError(credentialId, 'Informe um e-mail válido.');
+    invalid = true;
+  } else if (patientAccess && !emailLogin && !window.RadiaCpf?.isValid(credential)) {
+    setLoginFieldError(credentialId, 'CPF inválido. Verifique os números informados.');
     invalid = true;
   }
   if (password.length < 6) {
@@ -227,6 +231,9 @@ function prepareExamFile() {
     ['patient-name', 'patient-cpf', 'exam-type', 'body-region'].forEach(id => {
       if (!document.getElementById(id)?.value.trim()) throw new Error('Preencha paciente, CPF, tipo e região antes de selecionar a imagem.');
     });
+    if (!window.RadiaCpf.validateInput(document.getElementById('patient-cpf'))) {
+      throw new Error('Corrija o CPF do paciente antes de selecionar a imagem.');
+    }
   } catch (error) {
     input.value = '';
     return notify(error.message);
@@ -259,6 +266,9 @@ async function startAIAnalysis() {
   const file = document.getElementById('file-input')?.files?.[0];
   const button = document.getElementById('start-ai-analysis-btn');
   if (!file) return notify('Selecione a radiografia antes de iniciar a análise.');
+  if (!window.RadiaCpf.validateInput(document.getElementById('patient-cpf'))) {
+    return notify('Corrija o CPF do paciente antes de iniciar a análise.');
+  }
   button.disabled = true;
   button.textContent = 'Enviando e processando...';
   resetAiPanel('processando', 'Upload privado em andamento. Aguarde o processamento do modelo.');
