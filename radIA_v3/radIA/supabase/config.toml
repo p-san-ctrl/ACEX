@@ -1,0 +1,7 @@
+project_id = "radia"
+
+[functions.analisar-exame]
+verify_jwt = true
+
+[functions.revisar-exame]
+verify_jwt = true
