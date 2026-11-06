@@ -138,6 +138,8 @@
         <input
           id="cpf-input"
           class="w-full p-3 border rounded-lg"
+          data-cpf-or-email
+          maxlength="254"
           placeholder="000.000.000-00 ou seu e-mail"
         >
 
@@ -784,6 +786,7 @@
             <input
               id="patient-cpf"
               class="field"
+              data-cpf
               inputmode="numeric"
               maxlength="14"
               placeholder="000.000.000-00"
@@ -1675,6 +1678,7 @@
      CORREÇÕES / LGPD / MODAIS
 ========================================================= -->
 
+<script src="js/cpf.js"></script>
 <script src="js/ui-helpers.js"></script>
 
 

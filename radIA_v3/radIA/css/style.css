@@ -3,6 +3,8 @@ body{font-family:'Inter',sans-serif;transition:background-color .25s,color .25s}
 #modal-view{display:none}
 .field{width:100%;padding:.75rem;border:1px solid #cbd5e1;border-radius:.65rem;background:#fff;outline:none}
 .field:focus{box-shadow:0 0 0 3px rgba(37,99,235,.15);border-color:#3b82f6}
+.cpf-invalid,.cpf-invalid:focus{border-color:#ef4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.16)!important}
+.cpf-error{font-weight:600;color:#dc2626}
 .label{display:block;font-size:.875rem;font-weight:600;margin-bottom:.35rem}
 .meta{font-size:.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:.2rem}
 .privacy-badge{font-size:.75rem;background:#dcfce7;color:#166534;padding:.5rem .75rem;border-radius:999px}
@@ -80,6 +82,8 @@ html.dark{color-scheme:dark;--radia-bg:#0b1220;--radia-panel:#111a2e;--radia-bor
 .dark .text-slate-500,.dark .text-slate-400{color:#94a3b8}
 .dark .border,.dark .border-b,.dark .border-t,.dark .border-slate-100,.dark .border-slate-200,.dark .field{border-color:#334155}
 .dark .field,.dark input,.dark select,.dark textarea{background:#0b1220;color:#e2e8f0}
+.dark .cpf-invalid,.dark .cpf-invalid:focus{border-color:#f87171!important;box-shadow:0 0 0 3px rgba(248,113,113,.18)!important}
+.dark .cpf-error{color:#fca5a5}
 .dark input::placeholder,.dark textarea::placeholder{color:#64748b}
 .dark .bg-slate-50,.dark .bg-slate-100{background:#1e293b}
 .dark .hover\:bg-slate-50:hover{background:#1e293b}

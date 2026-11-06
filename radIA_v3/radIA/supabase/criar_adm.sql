@@ -37,15 +37,21 @@ begin
       atualizado_em = now()
   where id = v_usuario_id;
 
-  -- Caso o usuário tenha sido criado anteriormente com outro tipo,
-  -- removemos o registro específico desse tipo.
-  delete from public.pacientes where id = v_usuario_id;
-  delete from public.radiologistas where id = v_usuario_id;
-
   if not exists (select 1 from public.perfis where id = v_usuario_id) then
     insert into public.perfis (id, tipo, nome_completo, telefone)
     values (v_usuario_id, 'administrador', 'Administrador RadIA', null);
   end if;
+
+  -- O administrador também funciona como paciente de teste para permitir
+  -- o envio de exames pela interface profissional usando um CPF conhecido.
+  insert into public.pacientes (id, cpf, convenio)
+  values (v_usuario_id, '51861269005', 'Particular')
+  on conflict (id) do update
+  set cpf = excluded.cpf,
+      convenio = excluded.convenio;
+
+  -- O acesso profissional do administrador é controlado por perfis.tipo.
+  delete from public.radiologistas where id = v_usuario_id;
 end $$;
 
 -- Conferência:
@@ -53,7 +59,10 @@ select
   p.id,
   p.nome_completo,
   p.tipo,
-  u.email
+  u.email,
+  pa.cpf,
+  pa.convenio
 from public.perfis p
 join auth.users u on u.id = p.id
+left join public.pacientes pa on pa.id = p.id
 where u.email = 'admin@radia.test';

@@ -29,7 +29,7 @@
     assertFile(file);
     const supabase = client();
     const cpf = String(patientCpf || '').replace(/\D/g, '');
-    if (cpf.length !== 11) throw new Error('Informe um CPF válido com 11 dígitos.');
+    if (!window.RadiaCpf?.isValid(cpf)) throw new Error('Informe um CPF válido.');
 
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
