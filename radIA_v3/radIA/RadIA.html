@@ -2,7 +2,7 @@
 <!--
   radIA — Atendimento Radiológico
   Protótipo acadêmico.
-  IA intencionalmente desativada nesta versão.
+  IA usada apenas como apoio preliminar, com revisão obrigatória do radiologista.
 -->
 <html lang="pt-BR">
 
@@ -12,6 +12,7 @@
 
   <title>RadIA — Atendimento Radiológico</title>
 
+  <script src="js/theme.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
@@ -21,6 +22,7 @@
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
   >
 
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -35,6 +37,10 @@
   id="login-page"
   class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 to-indigo-950 p-4"
 >
+
+  <button type="button" onclick="toggleTheme()" class="theme-toggle fixed top-4 right-4 z-10" aria-label="Alternar tema">
+    <i class="fas fa-moon"></i>
+  </button>
 
   <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
 
@@ -227,7 +233,7 @@
         Acessar Sistema
       </button>
 
-      
+
 
 
       <!-- AVISO -->
@@ -265,9 +271,7 @@
 
     <!-- LOGO -->
 
-    <div
-      class="p-6 border-b border-slate-800 flex items-center gap-3"
-    >
+    <div class="p-6 border-b border-slate-800 flex items-center gap-3">
 
       <i class="fas fa-x-ray text-blue-400"></i>
 
@@ -280,6 +284,10 @@
         </span>
 
       </span>
+
+      <button type="button" onclick="toggleTheme()" class="theme-toggle ml-auto" aria-label="Alternar tema">
+        <i class="fas fa-moon"></i>
+      </button>
 
     </div>
 
@@ -393,7 +401,7 @@
 
 
         <button onclick="showSection('queue')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
-          <i class="fas fa-list-check w-5"></i>Fila inteligente
+          <i class="fas fa-list-check w-5"></i>Fila de pacientes
           <span id="queue-badge" class="ml-auto bg-slate-700 text-xs px-2 py-0.5 rounded-full">0</span>
         </button>
         <button onclick="showSection('config')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
@@ -614,7 +622,7 @@
       >
 
         <h2 class="text-3xl font-bold">
-          Resumo do sistema
+          Resumo diário
         </h2>
 
 
@@ -628,8 +636,12 @@
 
       </div>
 
+      <div class="scope-note">
+        <i class="fas fa-circle-info"></i>
+        <p><strong>Fluxo de atendimento:</strong> os pacientes entram na fila por prioridade e horário de chegada. Todo laudo precisa de revisão e aprovação do radiologista antes de ser liberado.</p>
+      </div>
 
-      <div class="grid md:grid-cols-3 gap-6">
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
 
         <div
@@ -655,7 +667,7 @@
         >
 
           <p class="text-slate-500 text-sm">
-            Exames no histórico
+            Pacientes na fila
           </p>
 
           <p
@@ -673,7 +685,7 @@
         >
 
           <p class="text-slate-500 text-sm">
-            Pendentes de revisão
+            Em atendimento
           </p>
 
           <p
@@ -683,6 +695,11 @@
             0
           </p>
 
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border">
+          <p class="text-slate-500 text-sm">Urgentes na fila</p>
+          <p class="text-3xl font-bold text-rose-600" id="stats-urgent">0</p>
         </div>
 
       </div>
@@ -1295,15 +1312,20 @@
     ====================================================== -->
     <section id="sec-queue" class="hidden space-y-6">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div><h2 class="text-2xl font-bold">Fila inteligente de exames</h2><p class="text-slate-500 mt-1">Exames ordenados automaticamente por prioridade e horário.</p></div>
-        <button onclick="openEnhancedExamModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm"><i class="fas fa-plus mr-2"></i>Novo exame rápido</button>
+        <div><h2 class="text-2xl font-bold">Fila de pacientes</h2><p class="text-slate-500 mt-1">Ordenada por prioridade clínica e horário de chegada.</p></div>
+        <button onclick="openEnhancedExamModal()" class="radia-btn"><i class="fas fa-plus mr-2"></i>Novo exame</button>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="queue-summary"><span id="queue-total">0</span><small>aguardando</small></div>
+        <div class="queue-summary queue-summary-urgent"><span id="queue-urgent">0</span><small>urgentes</small></div>
+        <div class="queue-summary queue-summary-active"><span id="queue-active">0</span><small>em atendimento</small></div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <input id="queue-search" oninput="renderEnhancedQueue()" class="border rounded-xl px-4 py-3 text-sm" placeholder="Buscar paciente, CPF ou exame...">
-        <select id="queue-priority" onchange="renderEnhancedQueue()" class="border rounded-xl px-4 py-3 text-sm"><option value="">Todas as prioridades</option><option>Urgente</option><option>Prioritário</option><option>Normal</option></select>
-        <select id="queue-status" onchange="renderEnhancedQueue()" class="border rounded-xl px-4 py-3 text-sm"><option value="">Todos os status</option><option>Pendente</option><option>Em análise</option><option>Concluído</option></select>
+        <input id="queue-search" oninput="renderEnhancedQueue()" class="field" placeholder="Buscar paciente, CPF ou exame...">
+        <select id="queue-priority" onchange="renderEnhancedQueue()" class="field"><option value="">Todas as prioridades</option><option>Urgente</option><option>Prioritário</option><option>Normal</option></select>
+        <select id="queue-status" onchange="renderEnhancedQueue()" class="field"><option value="">Todos os status</option><option>Na fila</option><option>Em análise</option><option>Rejeitado</option></select>
       </div>
-      <div class="bg-white rounded-2xl border shadow-sm overflow-hidden"><div id="enhanced-queue-list" class="divide-y"></div></div>
+      <div id="enhanced-queue-list" class="space-y-3"></div>
     </section>
 
     <section id="sec-config" class="hidden max-w-4xl space-y-6">
@@ -1317,16 +1339,25 @@
       </div>
     </section>
 
-    <div id="enhanced-exam-modal" class="hidden fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-sm items-center justify-center p-4">
-      <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl p-6">
-        <div class="flex justify-between items-center mb-5"><h3 class="text-xl font-bold">Cadastrar exame rápido</h3><button onclick="closeEnhancedExamModal()" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-xl"></i></button></div>
-        <form onsubmit="saveEnhancedExam(event)" class="space-y-4">
-          <div><label class="text-xs font-bold text-slate-600">Paciente</label><input id="enh-patient" required class="w-full border rounded-xl px-4 py-2.5 mt-1" placeholder="Nome completo"></div>
-          <div class="grid md:grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-600">CPF / ID</label><input id="enh-patient-id" required class="w-full border rounded-xl px-4 py-2.5 mt-1" placeholder="Identificação"></div><div><label class="text-xs font-bold text-slate-600">Tipo de exame</label><select id="enh-type" class="w-full border rounded-xl px-4 py-2.5 mt-1"><option>Raio-X</option><option>Tomografia</option><option>Ressonância</option><option>Ultrassonografia</option></select></div></div>
-          <div class="grid md:grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-600">Prioridade</label><select id="enh-priority" class="w-full border rounded-xl px-4 py-2.5 mt-1"><option>Normal</option><option>Prioritário</option><option>Urgente</option></select></div><div><label class="text-xs font-bold text-slate-600">Status</label><select id="enh-status" class="w-full border rounded-xl px-4 py-2.5 mt-1"><option>Pendente</option><option>Em análise</option><option>Concluído</option></select></div></div>
-          <div><label class="text-xs font-bold text-slate-600">Observações</label><textarea id="enh-notes" rows="3" class="w-full border rounded-xl px-4 py-2.5 mt-1" placeholder="Informações adicionais"></textarea></div>
-          <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold">Cadastrar exame</button>
-        </form>
+    <div id="attendance-modal" class="hidden fixed inset-0 z-[95] bg-slate-950/70 backdrop-blur-sm items-center justify-center p-4">
+      <div class="attendance-panel bg-white w-full max-w-6xl rounded-3xl shadow-2xl max-h-[94vh] overflow-y-auto">
+        <div class="sticky top-0 z-10 bg-white border-b px-6 py-5 flex items-start justify-between gap-4 rounded-t-3xl">
+          <div><p class="text-xs uppercase tracking-wider text-blue-600 font-bold">Atendimento radiológico</p><h3 id="attendance-patient" class="text-2xl font-bold mt-1"></h3><p id="attendance-meta" class="text-sm text-slate-500 mt-1"></p></div>
+          <button onclick="closeAttendanceModal()" class="text-slate-400 hover:text-slate-700" aria-label="Fechar atendimento"><i class="fas fa-times text-2xl"></i></button>
+        </div>
+        <div class="p-6 space-y-6">
+          <div id="attendance-flow" class="attendance-flow"></div>
+          <div class="grid lg:grid-cols-5 gap-6">
+            <div id="attendance-image-stage" class="lg:col-span-3 exam-viewer"><div class="text-center"><i class="fas fa-x-ray text-6xl text-blue-400 mb-4"></i><p class="font-semibold">Imagem do exame</p><p class="text-sm text-slate-400 mt-2">Carregando imagem privada...</p></div></div>
+            <div class="lg:col-span-2 space-y-4">
+              <div class="radia-card"><label class="label" for="attendance-report">Laudo do radiologista</label><textarea id="attendance-report" class="field" rows="7" placeholder="Descreva os achados e a conclusão..."></textarea></div>
+              <div class="radia-card"><label class="label" for="attendance-feedback">Orientação ao paciente</label><textarea id="attendance-feedback" class="field" rows="3" placeholder="Mensagem que ficará disponível ao paciente..."></textarea></div>
+              <label class="review-check"><input id="attendance-reviewed" type="checkbox"><span>Confirmo que revisei o exame e o laudo antes da liberação.</span></label>
+            </div>
+          </div>
+          <div class="radia-card"><h4 class="font-bold mb-3">Linha do tempo</h4><div id="attendance-timeline" class="space-y-3"></div></div>
+          <div class="border-t pt-5"><label class="label" for="attendance-reason">Justificativa para devolver à fila</label><textarea id="attendance-reason" class="field" rows="2" placeholder="Obrigatória somente ao devolver o atendimento"></textarea><div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-4"><button onclick="returnAttendanceToQueue()" class="radia-btn-secondary text-amber-700"><i class="fas fa-rotate-left mr-2"></i>Devolver à fila</button><button onclick="approveAttendance()" class="radia-btn"><i class="fas fa-check mr-2"></i>Aprovar e liberar laudo</button></div></div>
+        </div>
       </div>
     </div>
 
@@ -1644,546 +1675,9 @@
      CORREÇÕES / LGPD / MODAIS
 ========================================================= -->
 
-<script>
+<script src="js/ui-helpers.js"></script>
 
-/* =========================================================
-   VALIDAÇÃO DA LGPD
-========================================================= */
 
-function validatePatientLGPD() {
-
-  const userType =
-    document.getElementById('user-type').value;
-
-  /*
-    Radiologista não precisa marcar o termo
-    nesta tela.
-  */
-
-  if (userType !== 'paciente') {
-    return true;
-  }
-
-  // O administrador pode acessar a versão de paciente sem precisar
-  // aceitar o termo como se fosse um paciente real.
-  const cpfOuEmail = document.getElementById('cpf-input')?.value.trim() || '';
-  if (cpfOuEmail.includes('@')) {
-    return true;
-  }
-
-
-  const checkbox =
-    document.getElementById('patient-lgpd-checkbox');
-
-  const error =
-    document.getElementById('lgpd-error');
-
-
-  if (!checkbox.checked) {
-
-    error.classList.remove('hidden');
-
-    checkbox.focus();
-
-
-    if (typeof showToast === 'function') {
-
-      showToast(
-        'Aceite os termos de consentimento e privacidade para continuar.'
-      );
-
-    } else {
-
-      alert(
-        'Aceite os termos de consentimento e privacidade para continuar.'
-      );
-
-    }
-
-    return false;
-  }
-
-
-  error.classList.add('hidden');
-
-
-  /*
-    Registro de demonstração.
-
-    Em produção, esse registro deve ser enviado
-    e armazenado no servidor.
-  */
-
-  const consentRecord = {
-
-    termVersion: 'LGPD-2026.08',
-
-    acceptedAt:
-      new Date().toISOString(),
-
-    userType: 'paciente',
-
-    consent: true
-
-  };
-
-
-  console.log(
-    'Consentimento LGPD registrado:',
-    consentRecord
-  );
-
-
-  return true;
-
-}
-
-
-
-/* =========================================================
-   TROCA ENTRE PACIENTE E RADIOLOGISTA
-========================================================= */
-
-const originalToggleLoginFields =
-  window.toggleLoginFields;
-
-
-/*
-  Se seu script.js já possuir essa função,
-  ela será preservada e executada primeiro.
-*/
-
-window.toggleLoginFields = function() {
-
-
-  /*
-    Executa a função original, se existir.
-  */
-
-  if (
-    typeof originalToggleLoginFields === 'function'
-  ) {
-
-    originalToggleLoginFields.apply(
-      this,
-      arguments
-    );
-
-  }
-
-
-  const userType =
-    document.getElementById('user-type').value;
-
-
-  const professionalLogin =
-    document.getElementById('professional-login');
-
-
-  const patientLogin =
-    document.getElementById('patient-login');
-
-
-  const checkbox =
-    document.getElementById('patient-lgpd-checkbox');
-
-
-  const error =
-    document.getElementById('lgpd-error');
-
-
-  /*
-    PACIENTE
-  */
-
-  if (userType === 'paciente') {
-
-    professionalLogin.classList.add(
-      'hidden'
-    );
-
-    patientLogin.classList.remove(
-      'hidden'
-    );
-
-    return;
-
-  }
-
-
-  /*
-    RADIOLOGISTA
-  */
-
-  professionalLogin.classList.remove(
-    'hidden'
-  );
-
-  patientLogin.classList.add(
-    'hidden'
-  );
-
-
-  /*
-    Ao trocar para radiologista,
-    limpa o aceite do paciente.
-  */
-
-  if (checkbox) {
-    checkbox.checked = false;
-  }
-
-
-  if (error) {
-    error.classList.add('hidden');
-  }
-
-};
-
-
-
-/* =========================================================
-   MODAL DE DETALHES DO EXAME
-========================================================= */
-
-window.openModal = function() {
-
-  const modal =
-    document.getElementById('modal-view');
-
-
-  if (!modal) {
-    return;
-  }
-
-
-  modal.classList.remove(
-    'hidden'
-  );
-
-
-  modal.classList.add(
-    'flex'
-  );
-
-};
-
-
-
-window.closeModal = function() {
-
-  const modal =
-    document.getElementById('modal-view');
-
-
-  if (!modal) {
-    return;
-  }
-
-
-  modal.classList.add(
-    'hidden'
-  );
-
-
-  modal.classList.remove(
-    'flex'
-  );
-
-};
-
-
-
-/* =========================================================
-   MODAL LGPD
-========================================================= */
-
-window.openConsentDetails = function() {
-
-  const modal =
-    document.getElementById('consent-modal');
-
-
-  if (!modal) {
-    return;
-  }
-
-
-  modal.classList.remove(
-    'hidden'
-  );
-
-
-  modal.classList.add(
-    'flex'
-  );
-
-};
-
-
-
-window.closeConsentDetails = function() {
-
-  const modal =
-    document.getElementById('consent-modal');
-
-
-  if (!modal) {
-    return;
-  }
-
-
-  modal.classList.add(
-    'hidden'
-  );
-
-
-  modal.classList.remove(
-    'flex'
-  );
-
-};
-
-
-
-/* =========================================================
-   FECHAR MODAL DE EXAME CLICANDO FORA
-========================================================= */
-
-document.addEventListener(
-  'DOMContentLoaded',
-  function() {
-
-
-    /* =========================================
-       Inicialização correta do login
-    ========================================= */
-
-    const userType =
-      document.getElementById('user-type');
-
-
-    if (userType) {
-
-      /*
-        Garante que o formulário comece
-        mostrando o paciente.
-      */
-
-      document
-        .getElementById('professional-login')
-        .classList.add('hidden');
-
-
-      document
-        .getElementById('patient-login')
-        .classList.remove('hidden');
-
-    }
-
-
-    /* =========================================
-       Checkbox LGPD
-    ========================================= */
-
-    const checkbox =
-      document.getElementById(
-        'patient-lgpd-checkbox'
-      );
-
-
-    if (checkbox) {
-
-      checkbox.addEventListener(
-        'change',
-        function() {
-
-          const error =
-            document.getElementById(
-              'lgpd-error'
-            );
-
-
-          if (this.checked) {
-
-            error.classList.add(
-              'hidden'
-            );
-
-          }
-
-        }
-      );
-
-    }
-
-
-    /* =========================================
-       Modal de exame
-    ========================================= */
-
-    const examModal =
-      document.getElementById(
-        'modal-view'
-      );
-
-
-    if (examModal) {
-
-      examModal.addEventListener(
-        'click',
-        function(event) {
-
-          /*
-            Só fecha quando clicar no fundo escuro.
-            Clicar dentro da janela não fecha.
-          */
-
-          if (
-            event.target === examModal
-          ) {
-
-            closeModal();
-
-          }
-
-        }
-      );
-
-    }
-
-
-    /* =========================================
-       Modal LGPD
-    ========================================= */
-
-    const consentModal =
-      document.getElementById(
-        'consent-modal'
-      );
-
-
-    if (consentModal) {
-
-      consentModal.addEventListener(
-        'click',
-        function(event) {
-
-          /*
-            Fecha ao clicar no fundo escuro.
-          */
-
-          if (
-            event.target === consentModal
-          ) {
-
-            closeConsentDetails();
-
-          }
-
-        }
-      );
-
-    }
-
-
-  }
-);
-
-
-
-/* =========================================================
-   ESC FECHA OS MODAIS
-========================================================= */
-
-document.addEventListener(
-  'keydown',
-  function(event) {
-
-    if (event.key !== 'Escape') {
-      return;
-    }
-
-
-    closeModal();
-
-    closeConsentDetails();
-
-  }
-);
-
-</script>
-
-
-<script type="text/plain" data-disabled-reason="Protótipo localStorage substituído pela integração Supabase">
-/* =========================================================
-   CAMADA DE INTEGRAÇÃO — FUNCIONALIDADES V4 NO SISTEMA PRINCIPAL
-   Mantém as telas, login, consentimento e fluxo original.
-========================================================= */
-(function(){
- const KEY='radia_principal_v4_data';
- const state=JSON.parse(localStorage.getItem(KEY)||'null')||{exams:[],audit:[],notifications:[]};
- const weight={Urgente:0,'Prioritário':1,Normal:2};
- const $=id=>document.getElementById(id);
- function save(){ if(!$('setting-storage')||$('setting-storage').checked) localStorage.setItem(KEY,JSON.stringify(state)); }
- function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
- function toast2(msg){ if(typeof showToast==='function') return showToast(msg); const t=$('toast'),m=$('toast-msg'); if(t&&m){m.textContent=msg;t.classList.remove('translate-y-20','opacity-0');setTimeout(()=>t.classList.add('translate-y-20','opacity-0'),2800)} }
- function audit(action,details=''){state.audit.unshift({date:new Date().toLocaleString('pt-BR'),action,details});state.audit=state.audit.slice(0,100);save();}
- function notify(msg){state.notifications.unshift({msg,date:new Date().toLocaleTimeString('pt-BR')});state.notifications=state.notifications.slice(0,20);save();toast2(msg)}
- function bp(p){const c=p==='Urgente'?'bg-rose-100 text-rose-700':p==='Prioritário'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700';return `<span class="${c} px-2.5 py-1 rounded-full text-xs font-bold">${p}</span>`}
- function bs(s){const c=s==='Concluído'?'bg-emerald-100 text-emerald-700':s==='Em análise'?'bg-violet-100 text-violet-700':'bg-slate-100 text-slate-700';return `<span class="${c} px-2.5 py-1 rounded-full text-xs font-bold">${s}</span>`}
- window.renderEnhancedQueue=function(){const out=$('enhanced-queue-list');if(!out)return;const q=($('queue-search')?.value||'').toLowerCase(),p=$('queue-priority')?.value||'',s=$('queue-status')?.value||'';let ex=state.exams.filter(x=>(!q||x.patient.toLowerCase().includes(q)||x.patientId.toLowerCase().includes(q)||x.type.toLowerCase().includes(q))&&(!p||x.priority===p)&&(!s||x.status===s)).sort((a,b)=>weight[a.priority]-weight[b.priority]||new Date(a.created)-new Date(b.created));out.innerHTML=ex.map(x=>`<div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"><div><p class="font-bold">${esc(x.patient)}</p><p class="text-sm text-slate-500">${esc(x.type)} • ${esc(x.patientId)} • ${new Date(x.created).toLocaleString('pt-BR')}</p><p class="text-xs text-slate-400 mt-1">${esc(x.notes||'Sem observações')}</p></div><div class="flex flex-wrap items-center gap-2">${bp(x.priority)}${bs(x.status)}<select onchange="changeEnhancedStatus('${x.id}',this.value)" class="border rounded-lg px-2 py-1 text-xs"><option ${x.status==='Pendente'?'selected':''}>Pendente</option><option ${x.status==='Em análise'?'selected':''}>Em análise</option><option ${x.status==='Concluído'?'selected':''}>Concluído</option></select><button onclick="deleteEnhancedExam('${x.id}')" class="text-rose-600 px-2"><i class="fas fa-trash"></i></button></div></div>`).join('')||'<div class="p-12 text-center text-slate-400">Nenhum exame encontrado na fila.</div>';const badge=$('queue-badge');if(badge)badge.textContent=state.exams.filter(x=>x.status!=='Concluído').length;}
- window.openEnhancedExamModal=()=>{$('enhanced-exam-modal').classList.remove('hidden');$('enhanced-exam-modal').classList.add('flex')};
- window.closeEnhancedExamModal=()=>{$('enhanced-exam-modal').classList.add('hidden');$('enhanced-exam-modal').classList.remove('flex')};
- window.saveEnhancedExam=function(e){e.preventDefault();const x={id:'EX-'+Date.now().toString().slice(-7),patient:$('enh-patient').value.trim(),patientId:$('enh-patient-id').value.trim(),type:$('enh-type').value,priority:$('enh-priority').value,status:$('enh-status').value,notes:$('enh-notes').value.trim(),created:new Date().toISOString(),timeline:[{date:new Date().toLocaleString('pt-BR'),event:'Exame cadastrado'}]};state.exams.unshift(x);audit('Novo exame cadastrado',`${x.patient} — ${x.type}`);save();closeEnhancedExamModal();e.target.reset();renderEnhancedQueue();syncDashboard();renderPatientArea();notify(`Novo exame cadastrado para ${x.patient}`)};
- window.changeEnhancedStatus=function(id,status){const x=state.exams.find(e=>e.id===id);if(!x)return;x.status=status;x.updated=new Date().toISOString();x.timeline.push({date:new Date().toLocaleString('pt-BR'),event:'Status alterado para '+status});audit('Status atualizado',`${x.id}: ${status}`);save();renderEnhancedQueue();syncDashboard();renderPatientArea();notify(`Status do exame ${x.id} atualizado para ${status}`)};
- window.deleteEnhancedExam=function(id){if(!confirm('Excluir este exame?'))return;const x=state.exams.find(e=>e.id===id);state.exams=state.exams.filter(e=>e.id!==id);audit('Exame excluído',x?.patient||id);save();renderEnhancedQueue();syncDashboard();renderPatientArea();toast2('Exame removido com sucesso')};
- function syncDashboard(){renderEnhancedQueue();const exams=state.exams;const map={today:exams.filter(x=>new Date(x.created).toDateString()===new Date().toDateString()).length,total:exams.length,pending:exams.filter(x=>x.status!=='Concluído').length,urgent:exams.filter(x=>x.priority==='Urgente'&&x.status!=='Concluído').length};const candidates=[['todayCount',map.today],['historyCount',map.total],['pendingCount',map.pending],['urgentCount',map.urgent]];candidates.forEach(([id,v])=>{const el=$(id);if(el)el.textContent=v});}
- window.exportEnhancedData=function(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='radia-dados-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);audit('Dados exportados','JSON');toast2('Dados exportados com sucesso')};
- window.resetEnhancedData=function(){if(!confirm('Isso apagará os dados adicionados pelas funcionalidades avançadas. Continuar?'))return;state.exams=[];state.audit=[];state.notifications=[];localStorage.removeItem(KEY);renderEnhancedQueue();syncDashboard();toast2('Dados locais removidos')};
- // fallback de navegação: não substitui o showSection original, apenas garante as novas seções.
- const oldShow=window.showSection;
- window.showSection=function(name){if(typeof oldShow==='function'){try{oldShow(name)}catch(e){}}document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));const target=$('sec-'+name);if(target)target.classList.remove('hidden');document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('bg-blue-600'));document.querySelectorAll(`[onclick="showSection('${name}')"]`).forEach(b=>b.classList.add('bg-blue-600'));if(name==='queue')renderEnhancedQueue();if(name==='patient-dashboard'||name==='patient-exams'||name==='patient-notifications')renderPatientArea();};
- // integra os novos dados à tela original sem interferir no login.
- 
-/* =========================================================
-   NOVIDADES DA ÁREA DO PACIENTE
-========================================================= */
-function patientNameHint(){return (document.getElementById('user-name')?.textContent||'').trim().toLowerCase();}
-function patientVisibleExams(){
-  const n=patientNameHint();
-  if(!Array.isArray(state.exams)) return [];
-  // Demonstração: se o login não possuir nome, mostra os registros disponíveis.
-  const exact=state.exams.filter(x=>String(x.patient||'').toLowerCase()===n);
-  return exact.length?exact:state.exams;
-}
-function patientStatusClass(s){return s==='Concluído'?'bg-emerald-100 text-emerald-700':s==='Em análise'?'bg-violet-100 text-violet-700':'bg-amber-100 text-amber-700'}
-function renderPatientArea(){
-  const exams=patientVisibleExams();
-  const total=exams.length, done=exams.filter(x=>x.status==='Concluído').length, progress=total-done;
-  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
-  set('patient-kpi-total',total);set('patient-kpi-progress',progress);set('patient-kpi-done',done);set('patient-exam-badge',total);
-  const updates=[];
-  exams.forEach(x=>{(x.timeline||[]).forEach(t=>updates.push({date:t.date,event:t.event,exam:x.id,type:x.type}));});
-  updates.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  const unread=(state.notifications||[]).filter(n=>!n.read).length;set('patient-notif-badge',updates.length+unread);
-  const box=document.getElementById('patient-dashboard-updates');
-  if(box) box.innerHTML=updates.slice(0,5).map(u=>`<div class="flex gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100"><div class="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><i class="fas fa-bell"></i></div><div><p class="text-sm font-semibold">${u.event}</p><p class="text-xs text-slate-500 mt-1">${u.exam} • ${u.type||'Exame'} • ${u.date}</p></div></div>`).join('')||'<div class="text-center py-10 text-sm text-slate-400"><i class="fas fa-folder-open text-3xl mb-3 block"></i>Ainda não há movimentações para mostrar.</div>';
-  renderPatientExams();renderPatientNotifications();
-}
-window.renderPatientExams=function(){
-  const exams=patientVisibleExams();const q=(document.getElementById('patient-exam-search')?.value||'').toLowerCase();const f=document.getElementById('patient-exam-filter')?.value||'';
-  const arr=exams.filter(x=>(!q||String(x.id).toLowerCase().includes(q)||String(x.type).toLowerCase().includes(q))&&(!f||x.status===f));
-  const box=document.getElementById('patient-exams-list');if(!box)return;
-  box.innerHTML=arr.map(x=>`<div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"><div class="flex gap-4"><div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fas fa-x-ray"></i></div><div><p class="font-bold">${x.type||'Exame radiológico'}</p><p class="text-xs text-slate-500 mt-1">Código: ${x.id} • ${new Date(x.created||Date.now()).toLocaleDateString('pt-BR')}</p><p class="text-xs text-slate-400 mt-1">${x.notes||'Sem observações adicionais.'}</p></div></div><div class="flex items-center gap-3"><span class="px-3 py-1 rounded-full text-xs font-bold ${patientStatusClass(x.status)}">${x.status||'Pendente'}</span><button onclick="showPatientExamDetails('${x.id}')" class="border px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50">Detalhes</button></div></div>`).join('')||'<div class="p-12 text-center text-slate-400 text-sm">Nenhum exame encontrado.</div>';
-}
-window.showPatientExamDetails=function(id){const x=(state.exams||[]).find(e=>e.id===id);if(!x)return;const tl=(x.timeline||[]).map(t=>`<li class="py-2 border-b last:border-0"><b>${t.event}</b><br><span class="text-slate-500 text-xs">${t.date}</span></li>`).join('');alert(`EXAME: ${x.type}\nCÓDIGO: ${x.id}\nSTATUS: ${x.status}\n\nHISTÓRICO:\n${(x.timeline||[]).map(t=>'- '+t.event+' ('+t.date+')').join('\n')||'Sem movimentações.'}`)}
-function renderPatientNotifications(){const box=document.getElementById('patient-notifications-list');if(!box)return;const items=[];patientVisibleExams().forEach(x=>(x.timeline||[]).forEach(t=>items.push({title:t.event,desc:`${x.type||'Exame'} • ${x.id}`,date:t.date,read:false})));(state.notifications||[]).forEach(n=>items.push({title:n.title||'Atualização do sistema',desc:n.message||'',date:n.date||'',read:!!n.read}));items.sort((a,b)=>String(b.date).localeCompare(String(a.date)));box.innerHTML=items.map(i=>`<div class="bg-white border rounded-2xl p-5 flex gap-4 ${i.read?'opacity-70':''}"><div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><i class="fas fa-bell"></i></div><div class="flex-1"><p class="font-semibold text-sm">${i.title}</p><p class="text-sm text-slate-500 mt-1">${i.desc}</p><p class="text-xs text-slate-400 mt-2">${i.date}</p></div></div>`).join('')||'<div class="bg-white border rounded-2xl p-10 text-center text-slate-400">Nenhuma atualização disponível.</div>'}
-window.markPatientNotificationsRead=function(){if(state?.notifications){state.notifications.forEach(n=>n.read=true);if(typeof save==='function')save();}renderPatientArea();if(typeof notify==='function')notify('Atualizações marcadas como lidas.');}
-
-document.addEventListener('DOMContentLoaded',()=>{syncDashboard();renderPatientArea();const modal=$('enhanced-exam-modal');modal?.addEventListener('click',e=>{if(e.target===modal)closeEnhancedExamModal()});});
-})();
-</script>
 
 
 <!-- =========================================================
@@ -2193,6 +1687,7 @@ document.addEventListener('DOMContentLoaded',()=>{syncDashboard();renderPatientA
 <script src="js/exam-service.js"></script>
 <script src="js/ai-viewer.js"></script>
 <script src="js/script.js"></script>
+<script src="js/atendimento.js"></script>
 
 </body>
 </html>

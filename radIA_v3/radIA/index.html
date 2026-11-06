@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<!--
+  radIA — Atendimento Radiológico
+  Protótipo acadêmico.
+  IA usada apenas como apoio preliminar, com revisão obrigatória do radiologista.
+-->
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>RadIA — Atendimento Radiológico</title>
+
+  <script src="js/theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+  >
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="bg-slate-50 text-slate-900">
+
+
+<!-- =========================================================
+     LOGIN
+========================================================= -->
+
+<div
+  id="login-page"
+  class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 to-indigo-950 p-4"
+>
+
+  <button type="button" onclick="toggleTheme()" class="theme-toggle fixed top-4 right-4 z-10" aria-label="Alternar tema">
+    <i class="fas fa-moon"></i>
+  </button>
+
+  <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+
+    <!-- LOGO -->
+
+    <div class="text-center mb-8">
+
+      <div
+        class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+      >
+        <i class="fas fa-x-ray text-blue-600 text-2xl"></i>
+      </div>
+
+      <h1 class="text-3xl font-bold text-slate-800">
+        RadIA
+      </h1>
+
+      <p class="text-slate-500">
+        Sistema de Atendimento Radiológico
+      </p>
+
+    </div>
+
+
+    <div class="space-y-4">
+
+
+      <!-- TIPO DE USUÁRIO -->
+
+      <div>
+
+        <label class="block text-sm font-semibold mb-1">
+          Tipo de usuário
+        </label>
+
+        <select
+          id="user-type"
+          onchange="toggleLoginFields()"
+          class="w-full p-3 border rounded-lg"
+        >
+
+          <option value="paciente">
+            Paciente
+          </option>
+
+          <option value="radiologista">
+            Radiologista
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <!-- =====================================================
+           LOGIN DO RADIOLOGISTA
+      ====================================================== -->
+
+      <div id="professional-login" class="hidden">
+
+        <label class="block text-sm font-semibold mb-1">
+          CRM ou e-mail
+        </label>
+
+        <input
+          id="crm-input"
+          class="w-full p-3 border rounded-lg"
+          placeholder="123456 ou seu e-mail"
+        >
+
+        <label class="block text-sm font-semibold mb-1 mt-3">
+          Senha
+        </label>
+
+        <input
+          id="password-input"
+          type="password"
+          class="w-full p-3 border rounded-lg"
+          placeholder="Senha"
+        >
+
+      </div>
+
+
+      <!-- =====================================================
+           LOGIN DO PACIENTE
+      ====================================================== -->
+
+      <div id="patient-login">
+
+        <label class="block text-sm font-semibold mb-1">
+          CPF ou e-mail
+        </label>
+
+        <input
+          id="cpf-input"
+          class="w-full p-3 border rounded-lg"
+          placeholder="000.000.000-00 ou seu e-mail"
+        >
+
+
+        <label class="block text-sm font-semibold mb-1 mt-3">
+          Convênio
+        </label>
+
+        <input
+          id="insurance-input"
+          class="w-full p-3 border rounded-lg"
+          placeholder="Nome do convênio"
+        >
+
+        <label class="block text-sm font-semibold mb-1 mt-3">
+          Senha
+        </label>
+
+        <input
+          id="patient-password-input"
+          type="password"
+          minlength="6"
+          class="w-full p-3 border rounded-lg"
+          placeholder="Senha"
+        >
+
+
+        <!-- =================================================
+             ACEITE LGPD
+        ================================================== -->
+
+        <div
+          class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl"
+        >
+
+          <div class="flex items-start gap-3">
+
+            <input
+              id="patient-lgpd-checkbox"
+              type="checkbox"
+              class="mt-1 w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+            >
+
+            <label
+              for="patient-lgpd-checkbox"
+              class="text-sm text-slate-700 leading-5 cursor-pointer"
+            >
+
+              Li e aceito os
+
+              <button
+                type="button"
+                onclick="openConsentDetails()"
+                class="text-blue-700 font-semibold underline"
+              >
+                Termos de Consentimento e Privacidade (LGPD)
+              </button>
+
+              e autorizo o tratamento dos meus dados pessoais e dados
+              referentes à minha saúde para as finalidades informadas
+              no termo.
+
+            </label>
+
+          </div>
+
+
+          <!-- ERRO LGPD -->
+
+          <p
+            id="lgpd-error"
+            class="hidden text-xs text-red-600 mt-2"
+          >
+
+            <i class="fas fa-exclamation-circle mr-1"></i>
+
+            Para acessar o sistema, é necessário aceitar os termos
+            de consentimento e privacidade.
+
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <!-- BOTÃO LOGIN -->
+
+      <button
+        onclick="handleLogin()"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition"
+      >
+        Acessar Sistema
+      </button>
+
+
+
+
+      <!-- AVISO -->
+
+      <p class="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+
+        A autenticação é feita pelo Supabase Auth. Nunca coloque a chave secreta do Supabase neste arquivo.
+
+      </p>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     SISTEMA PRINCIPAL
+========================================================= -->
+
+<div
+  id="app-shell"
+  class="hidden min-h-screen flex"
+>
+
+
+  <!-- =======================================================
+       MENU LATERAL
+  ======================================================== -->
+
+  <aside class="w-64 bg-slate-900 text-white flex flex-col">
+
+
+    <!-- LOGO -->
+
+    <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+
+      <i class="fas fa-x-ray text-blue-400"></i>
+
+      <span class="font-bold text-xl">
+
+        RadIA
+
+        <span class="text-blue-400">
+          v3.0
+        </span>
+
+      </span>
+
+      <button type="button" onclick="toggleTheme()" class="theme-toggle ml-auto" aria-label="Alternar tema">
+        <i class="fas fa-moon"></i>
+      </button>
+
+    </div>
+
+
+    <!-- MENU -->
+
+    <nav class="flex-1 p-4 space-y-2">
+
+
+      <!-- MENU PACIENTE -->
+
+      <div
+        id="nav-patient"
+        class="hidden space-y-2"
+      >
+
+        <button onclick="showSection('patient-dashboard')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
+          <i class="fas fa-house w-5"></i>Minha área
+        </button>
+
+        <button onclick="showSection('patient-exams')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
+          <i class="fas fa-x-ray w-5"></i>Meus exames
+          <span id="patient-exam-badge" class="ml-auto bg-slate-700 text-xs px-2 py-0.5 rounded-full">0</span>
+        </button>
+
+        <button onclick="showSection('patient-notifications')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
+          <i class="fas fa-bell w-5"></i>Atualizações
+          <span id="patient-notif-badge" class="ml-auto bg-blue-600 text-xs px-2 py-0.5 rounded-full">0</span>
+        </button>
+
+        <button
+          onclick="showSection('patient-consent')"
+          class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+
+          <i class="fas fa-shield-alt w-5"></i>
+
+          Consentimento
+
+        </button>
+
+
+        <button
+          onclick="showSection('patient-feedback')"
+          class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+
+          <i class="fas fa-comment-medical w-5"></i>
+
+          Feedback do radiologista
+
+        </button>
+
+      </div>
+
+
+      <!-- MENU RADIOLOGISTA -->
+
+      <div
+        id="nav-radiologist"
+        class="hidden space-y-2"
+      >
+
+        <button
+          onclick="showSection('dashboard')"
+          class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+
+          <i class="fas fa-chart-line w-5"></i>
+
+          Dashboard
+
+        </button>
+
+
+        <button
+          onclick="showSection('new-exam')"
+          class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+
+          <i class="fas fa-plus-circle w-5"></i>
+
+          Novo Exame
+
+        </button>
+
+
+        <button
+          onclick="showSection('history')"
+          class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+
+          <i class="fas fa-folder-open w-5"></i>
+
+          Histórico
+
+        </button>
+
+
+        <button
+          onclick="showSection('logs')"
+          class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+
+          <i class="fas fa-list-ul w-5"></i>
+
+          Logs de Auditoria
+
+        </button>
+
+
+
+        <button onclick="showSection('queue')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
+          <i class="fas fa-list-check w-5"></i>Fila de pacientes
+          <span id="queue-badge" class="ml-auto bg-slate-700 text-xs px-2 py-0.5 rounded-full">0</span>
+        </button>
+        <button onclick="showSection('config')" class="nav-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800">
+          <i class="fas fa-gear w-5"></i>Configurações
+        </button>
+      </div>
+
+    </nav>
+
+
+    <!-- USUÁRIO -->
+
+    <div class="p-4 border-t border-slate-800">
+
+      <div
+        class="flex items-center gap-3 p-2 bg-slate-800 rounded-lg"
+      >
+
+        <div
+          id="user-avatar"
+          class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs"
+        >
+          US
+        </div>
+
+
+        <div class="text-xs truncate">
+
+          <p
+            class="font-bold"
+            id="user-name"
+          >
+            Usuário
+          </p>
+
+          <p
+            class="text-slate-400"
+            id="user-role"
+          >
+            Perfil
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <button
+        onclick="logout()"
+        class="w-full mt-4 text-sm text-slate-400 hover:text-red-400"
+      >
+        Sair
+      </button>
+
+    </div>
+
+  </aside>
+
+
+
+  <!-- =======================================================
+       CONTEÚDO
+  ======================================================== -->
+
+  <main
+    class="flex-1 overflow-y-auto bg-slate-50 p-8"
+  >
+
+
+    <!-- =====================================================
+         PACIENTE — ÁREA PRINCIPAL / NOVIDADES
+    ====================================================== -->
+    <section id="sec-patient-dashboard" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div><h2 class="text-3xl font-bold">Olá! 👋</h2><p class="text-slate-500 mt-1">Acompanhe seus exames, atualizações e retornos do radiologista.</p></div>
+        <button onclick="showSection('patient-exams')" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm"><i class="fas fa-folder-open mr-2"></i>Ver meus exames</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-xs font-bold text-slate-500 uppercase">Meus exames</p><p id="patient-kpi-total" class="text-3xl font-extrabold mt-2 text-blue-600">0</p><p class="text-xs text-slate-400 mt-1">Exames registrados</p></div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-xs font-bold text-slate-500 uppercase">Em andamento</p><p id="patient-kpi-progress" class="text-3xl font-extrabold mt-2 text-amber-500">0</p><p class="text-xs text-slate-400 mt-1">Aguardando conclusão</p></div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-xs font-bold text-slate-500 uppercase">Concluídos</p><p id="patient-kpi-done" class="text-3xl font-extrabold mt-2 text-emerald-600">0</p><p class="text-xs text-slate-400 mt-1">Disponíveis no histórico</p></div>
+      </div>
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border"><div class="flex justify-between items-center mb-4"><h3 class="font-bold">Últimas movimentações</h3><button onclick="showSection('patient-notifications')" class="text-xs text-blue-600 font-semibold">Ver todas</button></div><div id="patient-dashboard-updates" class="space-y-3"></div></div>
+        <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-6 rounded-2xl shadow-sm"><i class="fas fa-circle-info text-2xl opacity-80"></i><h3 class="font-bold mt-4">Tudo em um só lugar</h3><p class="text-sm text-blue-100 mt-2 leading-6">Agora você acompanha o andamento do exame, recebe atualizações e consulta o histórico diretamente pela área do paciente.</p></div>
+      </div>
+    </section>
+
+    <!-- PACIENTE — MEUS EXAMES -->
+    <section id="sec-patient-exams" class="hidden space-y-6">
+      <div><h2 class="text-2xl font-bold">Meus exames</h2><p class="text-sm text-slate-500">Consulte o andamento e os detalhes dos seus exames.</p></div>
+      <div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><div class="p-4 border-b flex flex-col md:flex-row gap-3"><div class="relative flex-1"><i class="fas fa-search absolute left-3 top-3 text-slate-400 text-xs"></i><input id="patient-exam-search" oninput="renderPatientExams()" class="w-full border rounded-xl pl-9 pr-4 py-2.5 text-sm" placeholder="Buscar por exame ou código..."></div><select id="patient-exam-filter" onchange="renderPatientExams()" class="border rounded-xl px-3 py-2.5 text-sm"><option value="">Todos os status</option><option>Pendente</option><option>Em análise</option><option>Concluído</option></select></div><div id="patient-exams-list" class="divide-y"></div></div>
+    </section>
+
+    <!-- PACIENTE — ATUALIZAÇÕES -->
+    <section id="sec-patient-notifications" class="hidden space-y-6">
+      <div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold">Atualizações</h2><p class="text-sm text-slate-500">Acompanhe as movimentações relacionadas aos seus exames.</p></div><button onclick="markPatientNotificationsRead()" class="text-sm text-blue-600 font-semibold">Marcar como lidas</button></div>
+      <div id="patient-notifications-list" class="space-y-3"></div>
+    </section>
+
+    <!-- =====================================================
+         PACIENTE — CONSENTIMENTO
+    ====================================================== -->
+
+    <section
+      id="sec-patient-consent"
+      class="hidden space-y-6"
+    >
+
+      <div
+        class="bg-white p-8 rounded-2xl shadow-sm border"
+      >
+
+        <div class="flex items-center gap-3 mb-4">
+
+          <i
+            class="fas fa-shield-alt text-blue-600 text-2xl"
+          ></i>
+
+          <h2 class="text-2xl font-bold">
+            Consentimento e privacidade
+          </h2>
+
+        </div>
+
+
+        <p class="text-slate-600 leading-7">
+
+          O consentimento permite o tratamento dos seus dados pessoais
+          e dados referentes à saúde para atendimento radiológico,
+          incluindo o compartilhamento das imagens de raio-X com o
+          radiologista responsável pelo atendimento.
+
+        </p>
+
+
+        <div
+          class="mt-5 p-4 bg-green-50 border border-green-200 rounded-xl"
+        >
+
+          <p class="font-semibold text-green-800">
+
+            <i class="fas fa-check-circle mr-2"></i>
+
+            Consentimento registrado
+
+          </p>
+
+          <p class="text-sm text-green-700 mt-1">
+
+            Termo LGPD-2026.08.
+            O registro contém a data e hora da manifestação.
+
+          </p>
+
+        </div>
+
+
+        <button
+          onclick="openConsentDetails()"
+          class="mt-4 text-blue-700 underline text-sm"
+        >
+
+          Ver detalhes do termo e privacidade
+
+        </button>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         PACIENTE — FEEDBACK
+    ====================================================== -->
+
+    <section
+      id="sec-patient-feedback"
+      class="hidden space-y-6"
+    >
+
+      <div>
+
+        <h2 class="text-2xl font-bold">
+          Feedback do radiologista
+        </h2>
+
+        <p class="text-sm text-slate-500">
+
+          Consulte os retornos disponibilizados pelo profissional responsável.
+
+        </p>
+
+      </div>
+
+
+      <div
+        id="patient-feedback-list"
+        class="space-y-4"
+      ></div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         DASHBOARD
+    ====================================================== -->
+
+    <section
+      id="sec-dashboard"
+      class="space-y-6"
+    >
+
+      <div
+        class="flex justify-between items-center"
+      >
+
+        <h2 class="text-3xl font-bold">
+          Resumo diário
+        </h2>
+
+
+        <span class="privacy-badge">
+
+          <i class="fas fa-shield-alt"></i>
+
+          Privacidade e auditoria
+
+        </span>
+
+      </div>
+
+      <div class="scope-note">
+        <i class="fas fa-circle-info"></i>
+        <p><strong>Fluxo de atendimento:</strong> os pacientes entram na fila por prioridade e horário de chegada. Todo laudo precisa de revisão e aprovação do radiologista antes de ser liberado.</p>
+      </div>
+
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border"
+        >
+
+          <p class="text-slate-500 text-sm">
+            Exames hoje
+          </p>
+
+          <p
+            class="text-3xl font-bold"
+            id="stats-today"
+          >
+            0
+          </p>
+
+        </div>
+
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border"
+        >
+
+          <p class="text-slate-500 text-sm">
+            Pacientes na fila
+          </p>
+
+          <p
+            class="text-3xl font-bold text-blue-600"
+            id="stats-history"
+          >
+            0
+          </p>
+
+        </div>
+
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border"
+        >
+
+          <p class="text-slate-500 text-sm">
+            Em atendimento
+          </p>
+
+          <p
+            class="text-3xl font-bold text-amber-600"
+            id="stats-pending"
+          >
+            0
+          </p>
+
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border">
+          <p class="text-slate-500 text-sm">Urgentes na fila</p>
+          <p class="text-3xl font-bold text-rose-600" id="stats-urgent">0</p>
+        </div>
+
+      </div>
+
+
+      <div class="grid lg:grid-cols-2 gap-6">
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border"
+        >
+
+          <h3 class="font-bold mb-4">
+            Exames por dia
+          </h3>
+
+          <canvas id="examChart"></canvas>
+
+        </div>
+
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border"
+        >
+
+          <h3 class="font-bold mb-4">
+            Status dos exames
+          </h3>
+
+          <canvas id="statusChart"></canvas>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         NOVO EXAME
+    ====================================================== -->
+
+    <section
+      id="sec-new-exam"
+      class="hidden space-y-6"
+    >
+
+      <h2 class="text-2xl font-bold">
+        Novo Exame
+      </h2>
+
+
+      <div
+        id="upload-box"
+        class="bg-white p-8 rounded-2xl shadow-sm border"
+      >
+
+        <div class="grid md:grid-cols-2 gap-4">
+
+
+          <div>
+
+            <label class="label">
+              Paciente
+            </label>
+
+            <input
+              id="patient-name"
+              class="field"
+              placeholder="Nome completo"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label class="label">
+              CPF do paciente
+            </label>
+
+            <input
+              id="patient-cpf"
+              class="field"
+              inputmode="numeric"
+              maxlength="14"
+              placeholder="000.000.000-00"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label class="label">
+              Data do exame
+            </label>
+
+            <input
+              id="exam-date"
+              type="date"
+              class="field"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label class="label">
+              Tipo de exame
+            </label>
+
+            <input
+              id="exam-type"
+              class="field"
+              placeholder="Ex.: Radiografia de tórax"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label class="label">
+              Região do corpo
+            </label>
+
+            <input
+              id="body-region"
+              class="field"
+              placeholder="Ex.: Tórax"
+            >
+
+          </div>
+
+        </div>
+
+
+        <!-- CONSENTIMENTO -->
+
+        <div
+          class="mt-5 p-4 bg-green-50 border border-green-200 rounded-xl"
+        >
+
+          <div class="flex gap-3 items-start">
+
+            <i
+              class="fas fa-check-circle text-green-600 mt-1"
+            ></i>
+
+
+            <div class="text-sm text-slate-700">
+
+              <strong>
+                Consentimento do paciente confirmado
+              </strong>
+
+              <br>
+
+              O radiologista somente acessa e registra informações
+              de pacientes que já passaram pelo fluxo de consentimento.
+              Nesta tela, o consentimento é considerado confirmado
+              para o atendimento em andamento.
+
+            </div>
+
+          </div>
+
+
+          <button
+            onclick="openConsentDetails()"
+            class="text-blue-700 text-xs mt-2 underline"
+          >
+
+            Ver detalhes do consentimento e privacidade
+
+          </button>
+
+
+          <input
+            id="consent-checkbox"
+            type="checkbox"
+            checked
+            class="hidden"
+          >
+
+        </div>
+
+
+        <!-- ARQUIVO -->
+
+        <div
+          class="mt-5 flex flex-wrap gap-3 items-center"
+        >
+
+          <input
+            type="file"
+            id="file-input"
+            class="hidden"
+            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+            onchange="prepareExamFile()"
+          >
+
+
+          <button
+            id="select-file-btn"
+            disabled
+            onclick="document.getElementById('file-input').click()"
+            class="bg-blue-600 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold"
+          >
+
+            Selecionar radiografia PNG ou JPG
+
+          </button>
+
+
+          <span
+            id="file-name"
+            class="text-sm text-slate-500"
+          >
+
+            Nenhum arquivo selecionado
+
+          </span>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- ESPAÇO DO EXAME -->
+
+      <div
+        id="exam-workspace"
+        class="hidden grid xl:grid-cols-12 gap-6"
+      >
+
+
+        <!-- VISUALIZAÇÃO -->
+
+        <div
+          class="xl:col-span-7 bg-slate-900 rounded-2xl min-h-[500px] flex items-center justify-center p-4"
+        >
+
+          <div
+            id="exam-image-stage"
+            class="relative hidden inline-block max-w-full"
+          >
+
+            <img
+              id="exam-img-preview"
+              class="block max-w-full max-h-[600px] object-contain"
+              alt="Radiografia original do exame"
+            >
+
+            <div
+              id="ai-overlay"
+              class="absolute inset-0 pointer-events-none"
+              aria-label="Marcações preliminares da inteligência artificial"
+            ></div>
+
+          </div>
+
+
+          <iframe
+            id="pdf-preview"
+            class="w-full h-[600px] hidden bg-white rounded-lg"
+          ></iframe>
+
+
+          <div
+            id="dicom-preview"
+            class="text-center text-white hidden"
+          >
+
+            <i
+              class="fas fa-x-ray text-6xl text-blue-400 mb-4"
+            ></i>
+
+            <p class="font-bold">
+              Arquivo DICOM recebido
+            </p>
+
+            <p class="text-sm text-slate-300 mt-2">
+
+              A visualização DICOM requer um visualizador compatível
+              no ambiente de produção. A IA foi deixada fora desta
+              versão, conforme solicitado.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- LAUDO -->
+
+        <div
+          class="xl:col-span-5 space-y-4"
+        >
+
+          <div
+            class="bg-white p-6 rounded-2xl shadow-sm border"
+          >
+
+            <div class="flex justify-between">
+
+              <h3 class="font-bold">
+                Laudo / revisão profissional
+              </h3>
+
+              <span
+                id="ai-status-badge"
+                class="text-xs bg-slate-100 px-2 py-1 rounded"
+              >
+                pendente
+              </span>
+
+            </div>
+
+
+            <p class="text-xs text-slate-500 mt-2">
+
+              A análise de IA é preliminar, limitada a radiografias de
+              punho pediátrico e pode produzir falsos positivos e falsos negativos.
+              A conclusão é sempre responsabilidade do radiologista.
+
+            </p>
+
+
+            <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+
+              <div class="flex items-start justify-between gap-3">
+
+                <div>
+
+                  <p id="ai-status-message" class="text-sm font-semibold text-blue-900">
+                    Selecione uma imagem para iniciar.
+                  </p>
+
+                  <p class="mt-1 text-xs text-blue-700">
+                    Modelo: <span id="ai-model-name">YOLOv8 GRAZPEDWRI-DX</span>
+                  </p>
+
+                </div>
+
+                <label class="flex items-center gap-2 text-xs text-blue-900">
+
+                  <input id="toggle-ai-overlay" type="checkbox" checked>
+                  Marcações
+
+                </label>
+
+              </div>
+
+              <ul id="ai-findings-list" class="mt-3 space-y-2"></ul>
+
+              <button
+                id="start-ai-analysis-btn"
+                type="button"
+                class="mt-4 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-400"
+              >
+                Enviar e analisar com IA
+              </button>
+
+            </div>
+
+
+            <textarea
+              id="laudo-text"
+              class="field mt-4 h-48"
+              placeholder="Digite o laudo..."
+            ></textarea>
+
+
+            <textarea
+              id="doctor-notes"
+              class="field mt-3 h-24"
+              placeholder="Anotações e observações adicionais..."
+            ></textarea>
+
+
+            <textarea
+              id="patient-feedback"
+              class="field mt-3 h-24"
+              placeholder="Feedback para o paciente (será disponibilizado após o atendimento)..."
+            ></textarea>
+
+
+            <div
+              class="grid grid-cols-2 gap-3 mt-4"
+            >
+
+              <button
+                onclick="finalizeExam()"
+                class="bg-green-600 text-white font-bold py-3 rounded-xl"
+              >
+
+                Aprovar análise e laudo
+
+              </button>
+
+
+              <button
+                onclick="showRejectBox()"
+                class="bg-red-600 text-white font-bold py-3 rounded-xl"
+              >
+
+                Rejeitar
+
+              </button>
+
+            </div>
+
+
+            <div
+              id="reject-box"
+              class="hidden mt-4"
+            >
+
+              <textarea
+                id="reject-reason"
+                class="field h-24"
+                placeholder="Motivo da rejeição..."
+              ></textarea>
+
+
+              <button
+                onclick="rejectExam()"
+                class="w-full mt-3 bg-red-600 text-white font-bold py-3 rounded-xl"
+              >
+
+                Confirmar rejeição
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         HISTÓRICO
+    ====================================================== -->
+
+    <section
+      id="sec-history"
+      class="hidden space-y-6"
+    >
+
+      <div
+        class="flex flex-wrap justify-between gap-4 items-end"
+      >
+
+        <div>
+
+          <h2 class="text-2xl font-bold">
+            Histórico de Exames
+          </h2>
+
+          <p class="text-sm text-slate-500">
+
+            Busca por nome, data, tipo ou região do corpo.
+
+          </p>
+
+        </div>
+
+
+        <button
+          onclick="exportHistoryPDF()"
+          class="bg-slate-800 text-white px-5 py-3 rounded-xl"
+        >
+
+          <i class="fas fa-file-pdf mr-2"></i>
+
+          Exportar resultado em PDF
+
+        </button>
+
+      </div>
+
+
+      <div
+        class="bg-white p-4 rounded-xl border grid md:grid-cols-4 gap-3"
+      >
+
+        <input
+          id="search-name"
+          oninput="loadHistory()"
+          class="field"
+          placeholder="Nome do paciente"
+        >
+
+
+        <input
+          id="search-date"
+          oninput="loadHistory()"
+          type="date"
+          class="field"
+        >
+
+
+        <input
+          id="search-type"
+          oninput="loadHistory()"
+          class="field"
+          placeholder="Tipo de exame"
+        >
+
+
+        <input
+          id="search-region"
+          oninput="loadHistory()"
+          class="field"
+          placeholder="Região do corpo"
+        >
+
+      </div>
+
+
+      <div
+        class="bg-white rounded-2xl shadow-sm border overflow-x-auto"
+      >
+
+        <table class="w-full text-left">
+
+          <thead class="bg-slate-50 border-b">
+
+            <tr>
+
+              <th class="p-4">
+                Data
+              </th>
+
+              <th class="p-4">
+                Paciente
+              </th>
+
+              <th class="p-4">
+                Tipo
+              </th>
+
+              <th class="p-4">
+                Região
+              </th>
+
+              <th class="p-4">
+                Status
+              </th>
+
+              <th class="p-4">
+                Ações
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody
+            id="history-table-body"
+          ></tbody>
+
+        </table>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         LOGS
+    ====================================================== -->
+
+    <section
+      id="sec-logs"
+      class="hidden space-y-6"
+    >
+
+      <h2 class="text-2xl font-bold">
+        Logs de Auditoria
+      </h2>
+
+
+      <div
+        class="bg-slate-900 rounded-xl p-6 font-mono text-xs text-green-400 h-96 overflow-y-auto"
+        id="log-container"
+      ></div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FUNCIONALIDADES AVANÇADAS — FILA / CONFIGURAÇÕES
+         Adicionadas ao sistema principal sem remover telas existentes
+    ====================================================== -->
+    <section id="sec-queue" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div><h2 class="text-2xl font-bold">Fila de pacientes</h2><p class="text-slate-500 mt-1">Ordenada por prioridade clínica e horário de chegada.</p></div>
+        <button onclick="openEnhancedExamModal()" class="radia-btn"><i class="fas fa-plus mr-2"></i>Novo exame</button>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="queue-summary"><span id="queue-total">0</span><small>aguardando</small></div>
+        <div class="queue-summary queue-summary-urgent"><span id="queue-urgent">0</span><small>urgentes</small></div>
+        <div class="queue-summary queue-summary-active"><span id="queue-active">0</span><small>em atendimento</small></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <input id="queue-search" oninput="renderEnhancedQueue()" class="field" placeholder="Buscar paciente, CPF ou exame...">
+        <select id="queue-priority" onchange="renderEnhancedQueue()" class="field"><option value="">Todas as prioridades</option><option>Urgente</option><option>Prioritário</option><option>Normal</option></select>
+        <select id="queue-status" onchange="renderEnhancedQueue()" class="field"><option value="">Todos os status</option><option>Na fila</option><option>Em análise</option><option>Rejeitado</option></select>
+      </div>
+      <div id="enhanced-queue-list" class="space-y-3"></div>
+    </section>
+
+    <section id="sec-config" class="hidden max-w-4xl space-y-6">
+      <div class="bg-white p-8 rounded-2xl border shadow-sm">
+        <h2 class="text-2xl font-bold">Configurações do sistema</h2><p class="text-slate-500 mt-1">Preferências de interface. Dados clínicos permanecem no Supabase privado.</p>
+        <div class="mt-7 space-y-5">
+          <label class="flex items-center justify-between border-b pb-5"><span><b class="text-sm">Notificações</b><br><small class="text-slate-500">Exibir alertas quando houver novos exames e mudanças de status.</small></span><input id="setting-notifications" type="checkbox" checked class="w-5 h-5"></label>
+          <label class="flex items-center justify-between border-b pb-5"><span><b class="text-sm">Armazenamento clínico privado</b><br><small class="text-slate-500">Imagens e laudos nunca são persistidos em localStorage.</small></span><input id="setting-storage" type="checkbox" checked disabled class="w-5 h-5"></label>
+          <div class="flex flex-wrap gap-3 pt-2"><button onclick="exportEnhancedData()" class="border border-slate-300 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"><i class="fas fa-file-export mr-2"></i>Política de exportação</button><button onclick="resetEnhancedData()" class="border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"><i class="fas fa-shield-alt mr-2"></i>Verificar armazenamento local</button></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="attendance-modal" class="hidden fixed inset-0 z-[95] bg-slate-950/70 backdrop-blur-sm items-center justify-center p-4">
+      <div class="attendance-panel bg-white w-full max-w-6xl rounded-3xl shadow-2xl max-h-[94vh] overflow-y-auto">
+        <div class="sticky top-0 z-10 bg-white border-b px-6 py-5 flex items-start justify-between gap-4 rounded-t-3xl">
+          <div><p class="text-xs uppercase tracking-wider text-blue-600 font-bold">Atendimento radiológico</p><h3 id="attendance-patient" class="text-2xl font-bold mt-1"></h3><p id="attendance-meta" class="text-sm text-slate-500 mt-1"></p></div>
+          <button onclick="closeAttendanceModal()" class="text-slate-400 hover:text-slate-700" aria-label="Fechar atendimento"><i class="fas fa-times text-2xl"></i></button>
+        </div>
+        <div class="p-6 space-y-6">
+          <div id="attendance-flow" class="attendance-flow"></div>
+          <div class="grid lg:grid-cols-5 gap-6">
+            <div id="attendance-image-stage" class="lg:col-span-3 exam-viewer"><div class="text-center"><i class="fas fa-x-ray text-6xl text-blue-400 mb-4"></i><p class="font-semibold">Imagem do exame</p><p class="text-sm text-slate-400 mt-2">Carregando imagem privada...</p></div></div>
+            <div class="lg:col-span-2 space-y-4">
+              <div class="radia-card"><label class="label" for="attendance-report">Laudo do radiologista</label><textarea id="attendance-report" class="field" rows="7" placeholder="Descreva os achados e a conclusão..."></textarea></div>
+              <div class="radia-card"><label class="label" for="attendance-feedback">Orientação ao paciente</label><textarea id="attendance-feedback" class="field" rows="3" placeholder="Mensagem que ficará disponível ao paciente..."></textarea></div>
+              <label class="review-check"><input id="attendance-reviewed" type="checkbox"><span>Confirmo que revisei o exame e o laudo antes da liberação.</span></label>
+            </div>
+          </div>
+          <div class="radia-card"><h4 class="font-bold mb-3">Linha do tempo</h4><div id="attendance-timeline" class="space-y-3"></div></div>
+          <div class="border-t pt-5"><label class="label" for="attendance-reason">Justificativa para devolver à fila</label><textarea id="attendance-reason" class="field" rows="2" placeholder="Obrigatória somente ao devolver o atendimento"></textarea><div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-4"><button onclick="returnAttendanceToQueue()" class="radia-btn-secondary text-amber-700"><i class="fas fa-rotate-left mr-2"></i>Devolver à fila</button><button onclick="approveAttendance()" class="radia-btn"><i class="fas fa-check mr-2"></i>Aprovar e liberar laudo</button></div></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+</div>
+
+
+
+<!-- =========================================================
+     MODAL DE DETALHES DO EXAME
+
+     IMPORTANTE:
+     AQUI ESTÁ A CORREÇÃO DO PROBLEMA DA SUA IMAGEM.
+
+     Antes:
+     class="fixed ... items-center ..."
+
+     Agora:
+     class="fixed ... hidden items-center ..."
+
+     Portanto ele começa ESCONDIDO.
+========================================================= -->
+
+<div
+  id="modal-view"
+  class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4"
+>
+
+  <div
+    class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+  >
+
+
+    <!-- CABEÇALHO -->
+
+    <div
+      class="p-6 border-b flex justify-between items-center"
+    >
+
+      <h3 class="text-xl font-bold">
+        Detalhes do Exame
+      </h3>
+
+
+      <button
+        onclick="closeModal()"
+        class="text-2xl hover:text-red-500"
+        aria-label="Fechar"
+      >
+
+        &times;
+
+      </button>
+
+    </div>
+
+
+    <!-- CONTEÚDO -->
+
+    <div
+      class="overflow-y-auto p-6 grid lg:grid-cols-2 gap-6"
+    >
+
+
+      <!-- MÍDIA -->
+
+      <div
+        id="modal-media"
+        class="bg-slate-100 rounded-xl min-h-[400px] flex items-center justify-center"
+      ></div>
+
+
+      <!-- INFORMAÇÕES -->
+
+      <div class="space-y-4">
+
+
+        <div>
+
+          <p class="meta">
+            Paciente
+          </p>
+
+          <p
+            id="modal-patient"
+            class="font-semibold"
+          ></p>
+
+        </div>
+
+
+        <div>
+
+          <p class="meta">
+            Data
+          </p>
+
+          <p id="modal-date"></p>
+
+        </div>
+
+
+        <div>
+
+          <p class="meta">
+            Tipo / Região
+          </p>
+
+          <p id="modal-type-region"></p>
+
+        </div>
+
+
+        <div>
+
+          <p class="meta">
+            Consentimento
+          </p>
+
+          <p
+            id="modal-consent"
+            class="text-sm"
+          ></p>
+
+        </div>
+
+
+        <div>
+
+          <p class="meta">
+            Laudo
+          </p>
+
+          <div
+            id="modal-laudo"
+            class="p-4 bg-blue-50 rounded-xl whitespace-pre-wrap"
+          ></div>
+
+        </div>
+
+
+        <div>
+
+          <p class="meta">
+            Observações
+          </p>
+
+          <div
+            id="modal-notes"
+            class="p-4 bg-slate-50 rounded-xl whitespace-pre-wrap"
+          ></div>
+
+        </div>
+
+
+        <div>
+
+          <p class="meta">
+            Feedback ao paciente
+          </p>
+
+          <div
+            id="modal-feedback"
+            class="p-4 bg-green-50 rounded-xl whitespace-pre-wrap"
+          ></div>
+
+        </div>
+
+
+        <button
+          onclick="printCurrentExam()"
+          class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-3 rounded-xl"
+        >
+
+          <i class="fas fa-print mr-2"></i>
+
+          Imprimir / Salvar como PDF
+
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     MODAL LGPD
+========================================================= -->
+
+<div
+  id="consent-modal"
+  class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4"
+>
+
+  <div
+    class="bg-white max-w-2xl w-full rounded-2xl p-6"
+  >
+
+    <div
+      class="flex justify-between items-center mb-3"
+    >
+
+      <h3 class="text-xl font-bold">
+        Consentimento e privacidade
+      </h3>
+
+
+      <button
+        onclick="closeConsentDetails()"
+        class="text-2xl text-slate-500 hover:text-red-500"
+        aria-label="Fechar"
+      >
+
+        &times;
+
+      </button>
+
+    </div>
+
+
+    <p
+      class="text-sm text-slate-600 leading-6"
+    >
+
+      O exame radiológico contém dados pessoais e informações
+      relativas à saúde. O uso deve ficar limitado ao atendimento
+      e às finalidades informadas ao paciente.
+
+      O sistema registra a manifestação de consentimento,
+      a versão do termo e o momento do registro.
+
+      Em produção, a organização deve disponibilizar canal para
+      exercício dos direitos do titular e manter políticas de
+      retenção, segurança, acesso e revogação adequadas.
+
+    </p>
+
+
+    <div
+      class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl"
+    >
+
+      <p class="text-sm font-semibold text-blue-800">
+
+        <i class="fas fa-shield-alt mr-2"></i>
+
+        Termo de Consentimento
+
+      </p>
+
+
+      <p class="text-xs text-blue-700 mt-1">
+
+        Versão do termo: LGPD-2026.08
+
+      </p>
+
+    </div>
+
+
+    <p class="text-xs text-slate-500 mt-4">
+
+      O protótipo não substitui revisão jurídica ou implementação
+      de controles de segurança no servidor.
+
+    </p>
+
+
+    <button
+      onclick="closeConsentDetails()"
+      class="mt-5 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
+    >
+
+      Fechar
+
+    </button>
+
+  </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     TOAST
+========================================================= -->
+
+<div
+  id="toast"
+  class="fixed bottom-10 right-10 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl translate-y-20 transition-all opacity-0 flex items-center gap-3 z-[100]"
+>
+
+  <i
+    class="fas fa-info-circle text-blue-400"
+  ></i>
+
+  <span id="toast-msg"></span>
+
+</div>
+
+
+
+
+
+
+
+
+<!-- =========================================================
+     CORREÇÕES / LGPD / MODAIS
+========================================================= -->
+
+<script src="js/ui-helpers.js"></script>
+
+
+
+
+<!-- =========================================================
+     MÓDULOS JAVASCRIPT
+========================================================= -->
+<script src="js/supabase-client.js"></script>
+<script src="js/exam-service.js"></script>
+<script src="js/ai-viewer.js"></script>
+<script src="js/script.js"></script>
+<script src="js/atendimento.js"></script>
+
+</body>
+</html>
