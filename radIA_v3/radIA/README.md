@@ -30,7 +30,9 @@ Imagens, fila e laudos não são gravados em `localStorage`: a fila de pacientes
 
 ### 1. Banco e Storage
 
-Aplique `supabase/migrations/20261106013404_add_fracture_ai_workflow.sql`. A migração cria/configura o bucket privado, colunas de rastreabilidade, índice de idempotência e política de limpeza de uploads com falha.
+Aplique `supabase/migrations/20261106013404_add_fracture_ai_workflow.sql`. A migração cria/configura o bucket privado, colunas de rastreabilidade, índice de idempotência e políticas de acesso às imagens.
+
+Se o restante da migração já estiver aplicado e a interface mostrar `Bucket not found`, execute apenas `supabase/configurar_storage.sql` no SQL Editor. O script é idempotente, mantém o bucket privado, limita os arquivos a 10 MB e aceita somente PNG/JPEG.
 
 O arquivo `supabase/schema.sql` é histórico e não corresponde ao banco atual; não o aplique.
 

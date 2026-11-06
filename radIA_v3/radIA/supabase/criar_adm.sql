@@ -50,8 +50,13 @@ begin
   set cpf = excluded.cpf,
       convenio = excluded.convenio;
 
-  -- O acesso profissional do administrador é controlado por perfis.tipo.
-  delete from public.radiologistas where id = v_usuario_id;
+  -- O mesmo administrador atua como radiologista de teste. Este registro é
+  -- necessário para exames.radiologista_id, que referencia radiologistas.id.
+  insert into public.radiologistas (id, crm, especialidade)
+  values (v_usuario_id, '999999', 'Radiologia')
+  on conflict (id) do update
+  set crm = excluded.crm,
+      especialidade = excluded.especialidade;
 end $$;
 
 -- Conferência:
@@ -61,8 +66,11 @@ select
   p.tipo,
   u.email,
   pa.cpf,
-  pa.convenio
+  pa.convenio,
+  r.crm,
+  r.especialidade
 from public.perfis p
 join auth.users u on u.id = p.id
 left join public.pacientes pa on pa.id = p.id
+left join public.radiologistas r on r.id = p.id
 where u.email = 'admin@radia.test';

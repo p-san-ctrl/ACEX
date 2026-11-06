@@ -25,6 +25,14 @@
     return new Error(message || fallback);
   }
 
+  function unwrapStorageError(error) {
+    const message = String(error?.message || '');
+    if (/bucket not found|nosuchbucket/i.test(message)) {
+      return new Error('O armazenamento de imagens ainda não foi configurado. Contate o administrador do RadIA.');
+    }
+    return error;
+  }
+
   async function uploadExam({ file, patientCpf, examDate, examType, bodyRegion, notes = '' }) {
     assertFile(file);
     const supabase = client();
@@ -68,7 +76,7 @@
       await supabase.from('exames').update({
         status: 'rejeitado', motivo_rejeicao: 'Falha técnica durante o upload da imagem.',
       }).eq('id', exam.id);
-      throw uploadError;
+      throw unwrapStorageError(uploadError);
     }
 
     const { data: examFile, error: fileError } = await supabase
