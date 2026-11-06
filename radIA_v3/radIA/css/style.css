@@ -9,3 +9,7 @@ body{font-family:'Inter',sans-serif}
 table td{vertical-align:middle}
 button:disabled{cursor:not-allowed}
 @media(max-width:900px){#app-shell{flex-direction:column}#app-shell>aside{width:100%}main{padding:1rem!important}}
+
+.ai-bounding-box{position:absolute;border:2px solid #f59e0b;border-radius:.25rem;box-shadow:0 0 0 1px rgb(15 23 42 / 45%)}
+.ai-bounding-box--fracture{border-color:#ef4444}
+.ai-bounding-box__label{position:absolute;left:-2px;top:0;max-width:16rem;transform:translateY(-100%);border-radius:.25rem .25rem 0 0;background:rgb(15 23 42 / 90%);color:#fff;font-size:.6875rem;font-weight:700;line-height:1.2;padding:.25rem .4rem;white-space:nowrap}

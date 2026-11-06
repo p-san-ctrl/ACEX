@@ -14,7 +14,7 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 
   <link
     rel="stylesheet"
@@ -883,7 +883,7 @@
             type="file"
             id="file-input"
             class="hidden"
-            accept=".dcm,.dicom,.png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
+            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
             onchange="prepareExamFile()"
           >
 
@@ -895,7 +895,7 @@
             class="bg-blue-600 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold"
           >
 
-            Selecionar DICOM, PNG, JPG ou PDF
+            Selecionar radiografia PNG ou JPG
 
           </button>
 
@@ -929,11 +929,24 @@
           class="xl:col-span-7 bg-slate-900 rounded-2xl min-h-[500px] flex items-center justify-center p-4"
         >
 
-          <img
-            id="exam-img-preview"
-            class="max-w-full max-h-[600px] object-contain hidden"
-            alt="Pré-visualização do exame"
+          <div
+            id="exam-image-stage"
+            class="relative hidden inline-block max-w-full"
           >
+
+            <img
+              id="exam-img-preview"
+              class="block max-w-full max-h-[600px] object-contain"
+              alt="Radiografia original do exame"
+            >
+
+            <div
+              id="ai-overlay"
+              class="absolute inset-0 pointer-events-none"
+              aria-label="Marcações preliminares da inteligência artificial"
+            ></div>
+
+          </div>
 
 
           <iframe
@@ -986,9 +999,10 @@
               </h3>
 
               <span
+                id="ai-status-badge"
                 class="text-xs bg-slate-100 px-2 py-1 rounded"
               >
-                Sem IA
+                pendente
               </span>
 
             </div>
@@ -996,10 +1010,49 @@
 
             <p class="text-xs text-slate-500 mt-2">
 
-              Nesta versão o laudo é elaborado e revisado
-              manualmente pelo profissional.
+              A análise de IA é preliminar, limitada a radiografias de
+              punho pediátrico e pode produzir falsos positivos e falsos negativos.
+              A conclusão é sempre responsabilidade do radiologista.
 
             </p>
+
+
+            <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+
+              <div class="flex items-start justify-between gap-3">
+
+                <div>
+
+                  <p id="ai-status-message" class="text-sm font-semibold text-blue-900">
+                    Selecione uma imagem para iniciar.
+                  </p>
+
+                  <p class="mt-1 text-xs text-blue-700">
+                    Modelo: <span id="ai-model-name">YOLOv8 GRAZPEDWRI-DX</span>
+                  </p>
+
+                </div>
+
+                <label class="flex items-center gap-2 text-xs text-blue-900">
+
+                  <input id="toggle-ai-overlay" type="checkbox" checked>
+                  Marcações
+
+                </label>
+
+              </div>
+
+              <ul id="ai-findings-list" class="mt-3 space-y-2"></ul>
+
+              <button
+                id="start-ai-analysis-btn"
+                type="button"
+                class="mt-4 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-400"
+              >
+                Enviar e analisar com IA
+              </button>
+
+            </div>
 
 
             <textarea
@@ -1028,11 +1081,11 @@
             >
 
               <button
-                onclick="finalizeExam('Aprovado')"
+                onclick="finalizeExam()"
                 class="bg-green-600 text-white font-bold py-3 rounded-xl"
               >
 
-                Aprovar laudo
+                Aprovar análise e laudo
 
               </button>
 
@@ -1255,11 +1308,11 @@
 
     <section id="sec-config" class="hidden max-w-4xl space-y-6">
       <div class="bg-white p-8 rounded-2xl border shadow-sm">
-        <h2 class="text-2xl font-bold">Configurações do sistema</h2><p class="text-slate-500 mt-1">Preferências locais do RadIA e gerenciamento dos dados salvos no navegador.</p>
+        <h2 class="text-2xl font-bold">Configurações do sistema</h2><p class="text-slate-500 mt-1">Preferências de interface. Dados clínicos permanecem no Supabase privado.</p>
         <div class="mt-7 space-y-5">
           <label class="flex items-center justify-between border-b pb-5"><span><b class="text-sm">Notificações</b><br><small class="text-slate-500">Exibir alertas quando houver novos exames e mudanças de status.</small></span><input id="setting-notifications" type="checkbox" checked class="w-5 h-5"></label>
-          <label class="flex items-center justify-between border-b pb-5"><span><b class="text-sm">Salvar dados localmente</b><br><small class="text-slate-500">Manter exames e auditoria após atualizar a página.</small></span><input id="setting-storage" type="checkbox" checked class="w-5 h-5"></label>
-          <div class="flex flex-wrap gap-3 pt-2"><button onclick="exportEnhancedData()" class="border border-slate-300 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"><i class="fas fa-file-export mr-2"></i>Exportar dados</button><button onclick="resetEnhancedData()" class="border border-rose-200 text-rose-600 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-rose-50"><i class="fas fa-trash mr-2"></i>Limpar dados locais</button></div>
+          <label class="flex items-center justify-between border-b pb-5"><span><b class="text-sm">Armazenamento clínico privado</b><br><small class="text-slate-500">Imagens e laudos nunca são persistidos em localStorage.</small></span><input id="setting-storage" type="checkbox" checked disabled class="w-5 h-5"></label>
+          <div class="flex flex-wrap gap-3 pt-2"><button onclick="exportEnhancedData()" class="border border-slate-300 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"><i class="fas fa-file-export mr-2"></i>Política de exportação</button><button onclick="resetEnhancedData()" class="border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"><i class="fas fa-shield-alt mr-2"></i>Verificar armazenamento local</button></div>
         </div>
       </div>
     </section>
@@ -2062,7 +2115,7 @@ document.addEventListener(
 </script>
 
 
-<script>
+<script type="text/plain" data-disabled-reason="Protótipo localStorage substituído pela integração Supabase">
 /* =========================================================
    CAMADA DE INTEGRAÇÃO — FUNCIONALIDADES V4 NO SISTEMA PRINCIPAL
    Mantém as telas, login, consentimento e fluxo original.
@@ -2137,6 +2190,8 @@ document.addEventListener('DOMContentLoaded',()=>{syncDashboard();renderPatientA
      MÓDULOS JAVASCRIPT
 ========================================================= -->
 <script src="js/supabase-client.js"></script>
+<script src="js/exam-service.js"></script>
+<script src="js/ai-viewer.js"></script>
 <script src="js/script.js"></script>
 
 </body>

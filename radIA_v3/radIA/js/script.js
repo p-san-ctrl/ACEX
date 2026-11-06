@@ -1,49 +1,47 @@
-// REQ-LGPD: identifica a versão do termo de consentimento registrada com cada exame.
-// NOTA: em produção, a versão deve ser controlada no backend para garantir integridade e rastreabilidade.
 const CONSENT_VERSION = 'LGPD-2026.08';
 let currentUser = null;
-window.radiaCurrentUser = null;
 let currentExam = null;
-// REQ-HISTÓRICO: protótipo usa localStorage para persistir exames.
-// IMPORTANTE: localStorage NÃO é adequado para dados médicos em produção; usar backend + banco seguro.
-let exams = JSON.parse(localStorage.getItem('radia_exams') || '[]');
-let logs = JSON.parse(localStorage.getItem('radia_logs') || '[]');
-// FLUXO PACIENTE: feedback do radiologista fica associado ao exame e só é exibido ao paciente.
+let activeExamId = null;
+let currentAnalysis = null;
+let previewUrl = null;
+let examChart = null;
+let statusChart = null;
 
-let examChart = null, statusChart = null;
+window.radiaCurrentUser = null;
 
-function esc(value='') {
-  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+function esc(value = '') {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[character]);
 }
-function notify(msg) {
-  const toast=document.getElementById('toast');
-  document.getElementById('toast-msg').innerText=msg;
-  toast.classList.remove('translate-y-20','opacity-0');
-  setTimeout(()=>toast.classList.add('translate-y-20','opacity-0'),3000);
+
+function notify(message) {
+  const toast = document.getElementById('toast');
+  const output = document.getElementById('toast-msg');
+  if (!toast || !output) return;
+  output.textContent = message;
+  toast.classList.remove('translate-y-20', 'opacity-0');
+  setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3500);
 }
+
 function clearLoginFieldError(inputId) {
   const input = document.getElementById(inputId);
   if (!input) return;
-
   input.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
   input.removeAttribute('aria-invalid');
-
-  const error = document.getElementById(`${inputId}-error`);
-  if (error) error.remove();
+  document.getElementById(`${inputId}-error`)?.remove();
 }
 
 function setLoginFieldError(inputId, message) {
   const input = document.getElementById(inputId);
   if (!input) return;
-
   clearLoginFieldError(inputId);
   input.classList.add('border-red-500', 'ring-2', 'ring-red-200');
   input.setAttribute('aria-invalid', 'true');
-
   const error = document.createElement('p');
   error.id = `${inputId}-error`;
   error.className = 'text-xs text-red-600 mt-1';
-  error.innerHTML = `<i class="fas fa-exclamation-circle mr-1"></i>${esc(message)}`;
+  error.textContent = message;
   input.insertAdjacentElement('afterend', error);
 }
 
@@ -52,18 +50,13 @@ function clearLoginErrors() {
     .forEach(clearLoginFieldError);
 }
 
-function showLoginValidation(message) {
-  notify(message);
-}
-
 function setupLoginValidation() {
-  ['cpf-input', 'insurance-input', 'patient-password-input', 'crm-input', 'password-input']
-    .forEach(id => {
-      const input = document.getElementById(id);
-      if (!input || input.dataset.loginValidationReady) return;
-      input.dataset.loginValidationReady = 'true';
-      input.addEventListener('input', () => clearLoginFieldError(id));
-    });
+  ['cpf-input', 'insurance-input', 'patient-password-input', 'crm-input', 'password-input'].forEach(id => {
+    const input = document.getElementById(id);
+    if (!input || input.dataset.loginValidationReady) return;
+    input.dataset.loginValidationReady = 'true';
+    input.addEventListener('input', () => clearLoginFieldError(id));
+  });
 }
 
 function toggleLoginFields() {
@@ -73,382 +66,565 @@ function toggleLoginFields() {
   clearLoginErrors();
 }
 
-// REQ-AUTENTICAÇÃO: login real usando Supabase Auth.
-// Paciente: CPF ou e-mail + convênio + senha.
-// Radiologista: CRM ou e-mail + senha.
-// Administrador: e-mail + senha e pode escolher qualquer uma das duas interfaces.
 async function handleLogin() {
-  if (!window.radiaSupabase) {
-    return notify('Supabase não está configurado. Preencha a URL e a chave no arquivo js/supabase-client.js.');
-  }
-
+  if (!window.radiaSupabase) return notify('Supabase não está configurado.');
   clearLoginErrors();
   setupLoginValidation();
 
   const accessType = document.getElementById('user-type').value;
-  const isPatientAccess = accessType === 'paciente';
-  const credentialId = isPatientAccess ? 'cpf-input' : 'crm-input';
-  const passwordId = isPatientAccess ? 'patient-password-input' : 'password-input';
-  const credentialInput = document.getElementById(credentialId);
-  const credentialRaw = credentialInput?.value.trim() || '';
+  const patientAccess = accessType === 'paciente';
+  const credentialId = patientAccess ? 'cpf-input' : 'crm-input';
+  const passwordId = patientAccess ? 'patient-password-input' : 'password-input';
+  const credential = document.getElementById(credentialId)?.value.trim() || '';
   const password = document.getElementById(passwordId)?.value || '';
   const insurance = document.getElementById('insurance-input')?.value.trim() || '';
-  const isEmail = credentialRaw.includes('@');
+  const emailLogin = credential.includes('@');
+  let invalid = false;
 
-  let hasError = false;
-
-  if (!credentialRaw) {
-    setLoginFieldError(credentialId, isPatientAccess
-      ? 'Informe o CPF ou o e-mail.'
-      : 'Informe o CRM ou o e-mail.');
-    hasError = true;
-  } else if (isEmail) {
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(credentialRaw);
-    if (!emailOk) {
-      setLoginFieldError(credentialId, 'Informe um e-mail válido.');
-      hasError = true;
-    }
+  if (!credential) {
+    setLoginFieldError(credentialId, patientAccess ? 'Informe o CPF ou o e-mail.' : 'Informe o CRM ou o e-mail.');
+    invalid = true;
+  } else if (emailLogin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(credential)) {
+    setLoginFieldError(credentialId, 'Informe um e-mail válido.');
+    invalid = true;
   }
-
-  if (!password) {
-    setLoginFieldError(passwordId, 'Informe a senha.');
-    hasError = true;
-  } else if (password.length < 6) {
+  if (password.length < 6) {
     setLoginFieldError(passwordId, 'A senha deve ter pelo menos 6 caracteres.');
-    hasError = true;
+    invalid = true;
   }
-
-  // Para paciente, o convênio continua sendo conferido no cadastro.
-  // Ele fica opcional apenas nesta primeira validação quando o identificador
-  // é um e-mail, pois o administrador também entra pela interface de paciente.
-  if (isPatientAccess && !isEmail && !insurance) {
+  if (patientAccess && !emailLogin && !insurance) {
     setLoginFieldError('insurance-input', 'Informe o convênio.');
-    hasError = true;
+    invalid = true;
   }
-
-  if (hasError) {
-    return showLoginValidation('Preencha corretamente os campos destacados.');
-  }
-
-  let email = credentialRaw.toLowerCase();
-  const adminLogin = isEmail;
+  if (invalid) return notify('Preencha corretamente os campos destacados.');
 
   try {
-    // Usuários comuns podem entrar pelo CPF/CRM. A função SQL converte
-    // o identificador em e-mail sem expor auth.users ao navegador.
-    if (!adminLogin) {
-      const identifier = credentialRaw.replace(/\D/g, '');
-      const functionType = isPatientAccess ? 'paciente' : 'radiologista';
-
-      if (isPatientAccess && identifier.length !== 11) {
-        setLoginFieldError(credentialId, 'Informe um CPF válido com 11 dígitos.');
-        return showLoginValidation('Corrija o CPF destacado.');
+    let email = credential.toLowerCase();
+    if (!emailLogin) {
+      const identifier = credential.replace(/\D/g, '');
+      if ((patientAccess && identifier.length !== 11) || (!patientAccess && identifier.length < 4)) {
+        setLoginFieldError(credentialId, patientAccess ? 'Informe um CPF válido.' : 'Informe um CRM válido.');
+        return notify('Corrija o identificador destacado.');
       }
-
-      if (!isPatientAccess && identifier.length < 4) {
-        setLoginFieldError(credentialId, 'Informe um CRM válido.');
-        return showLoginValidation('Corrija o CRM destacado.');
+      const { data: lookup, error: lookupError } = await window.radiaSupabase.rpc('obter_email_login', {
+        p_tipo: patientAccess ? 'paciente' : 'radiologista', p_identificador: identifier,
+      });
+      if (lookupError) throw lookupError;
+      if (!lookup) {
+        setLoginFieldError(credentialId, 'Cadastro não encontrado.');
+        return notify('Cadastro não encontrado.');
       }
-
-      const { data: lookup, error: lookupError } = await window.radiaSupabase
-        .rpc('obter_email_login', {
-          p_tipo: functionType,
-          p_identificador: identifier
-        });
-
-      if (lookupError) {
-        console.error('Erro ao localizar usuário:', lookupError);
-        return notify('Não foi possível consultar o cadastro no banco. Verifique se o SQL de login foi executado.');
-      }
-
-      email = lookup || '';
-      if (!email) {
-        setLoginFieldError(credentialId, isPatientAccess
-          ? 'CPF não encontrado no cadastro.'
-          : 'CRM não encontrado no cadastro.');
-        return showLoginValidation(isPatientAccess
-          ? 'CPF não encontrado no cadastro.'
-          : 'CRM não encontrado no cadastro.');
-      }
+      email = lookup;
     }
 
-    const { data, error } = await window.radiaSupabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
+    const { data, error } = await window.radiaSupabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.error('Erro no login:', error);
-      setLoginFieldError(passwordId, 'Senha incorreta ou usuário não autorizado.');
-      return notify('Não foi possível entrar. Verifique o e-mail/CPF/CRM e a senha.');
+      setLoginFieldError(passwordId, 'Credenciais inválidas.');
+      return notify('Não foi possível entrar. Verifique seus dados.');
     }
-
-    // Descobre o papel real do usuário no banco.
-    const { data: perfil, error: perfilError } = await window.radiaSupabase
-      .from('perfis')
-      .select('id, tipo, nome_completo, telefone')
-      .eq('id', data.user.id)
-      .single();
-
-    if (perfilError || !perfil) {
+    const { data: profile, error: profileError } = await window.radiaSupabase.from('perfis')
+      .select('id, tipo, nome_completo, telefone').eq('id', data.user.id).single();
+    if (profileError || !profile) throw profileError || new Error('Perfil não encontrado.');
+    if (profile.tipo !== 'administrador' && profile.tipo !== accessType) {
       await window.radiaSupabase.auth.signOut();
-      console.error('Erro ao carregar perfil:', perfilError);
-      return notify('Usuário autenticado, mas o perfil não foi encontrado no banco.');
+      return notify(`Este usuário é cadastrado como ${profile.tipo}.`);
     }
-
-    // Administrador pode entrar pela interface de paciente ou de radiologista.
-    if (perfil.tipo !== 'administrador' && perfil.tipo !== accessType) {
-      await window.radiaSupabase.auth.signOut();
-      return notify(`Este usuário é cadastrado como ${perfil.tipo} e não pode entrar como ${accessType}.`);
-    }
-
-    // Paciente comum precisa informar um convênio que corresponda ao cadastro.
-    // Administrador não possui convênio e, por isso, pode acessar a interface
-    // de paciente sem preencher esse campo.
-    if (perfil.tipo === 'paciente') {
-      if (!insurance) {
-        await window.radiaSupabase.auth.signOut();
-        setLoginFieldError('insurance-input', 'Informe o convênio.');
-        return showLoginValidation('Informe o convênio para entrar como paciente.');
-      }
-
-      const { data: paciente, error: pacienteError } = await window.radiaSupabase
-        .from('pacientes')
-        .select('cpf, convenio')
-        .eq('id', data.user.id)
-        .single();
-
-      if (pacienteError || !paciente) {
-        await window.radiaSupabase.auth.signOut();
-        return notify('Cadastro de paciente não encontrado.');
-      }
-
-      if (paciente.convenio?.trim().toLowerCase() !== insurance.toLowerCase()) {
+    if (profile.tipo === 'paciente') {
+      const { data: patient } = await window.radiaSupabase.from('pacientes')
+        .select('convenio').eq('id', data.user.id).single();
+      if (!insurance || patient?.convenio?.trim().toLowerCase() !== insurance.toLowerCase()) {
         await window.radiaSupabase.auth.signOut();
         setLoginFieldError('insurance-input', 'O convênio não corresponde ao cadastro.');
-        return showLoginValidation('O convênio informado não corresponde ao cadastro.');
+        return notify('Convênio inválido.');
       }
     }
 
     currentUser = {
       type: accessType,
-      actualRole: perfil.tipo,
-      name: perfil.nome_completo || (isPatientAccess ? 'Paciente' : 'Radiologista'),
-      identifier: isEmail ? data.user.email : credentialRaw,
+      actualRole: profile.tipo,
+      name: profile.nome_completo || 'Usuário',
+      identifier: emailLogin ? data.user.email : credential,
       id: data.user.id,
-      email: data.user.email
+      email: data.user.email,
     };
     window.radiaCurrentUser = currentUser;
-
-    document.getElementById('user-name').innerText = currentUser.name;
-    document.getElementById('user-role').innerText = currentUser.actualRole === 'administrador'
-      ? `${currentUser.type} • administrador • ${currentUser.identifier}`
-      : currentUser.type + ' • ' + currentUser.identifier;
-    document.getElementById('user-avatar').innerText = currentUser.name.slice(0, 2).toUpperCase();
+    document.getElementById('user-name').textContent = currentUser.name;
+    document.getElementById('user-role').textContent = profile.tipo === 'administrador'
+      ? `${accessType} • administrador • ${currentUser.identifier}`
+      : `${accessType} • ${currentUser.identifier}`;
+    document.getElementById('user-avatar').textContent = currentUser.name.slice(0, 2).toUpperCase();
     document.getElementById('login-page').classList.add('hidden');
     document.getElementById('app-shell').classList.remove('hidden');
-    document.getElementById('nav-patient').classList.toggle('hidden', currentUser.type !== 'paciente');
-    document.getElementById('nav-radiologist').classList.toggle('hidden', currentUser.type !== 'radiologista');
-    addLog('Login realizado: ' + currentUser.type + (currentUser.actualRole === 'administrador' ? ' (administrador)' : ''));
+    document.getElementById('nav-patient').classList.toggle('hidden', accessType !== 'paciente');
+    document.getElementById('nav-radiologist').classList.toggle('hidden', accessType !== 'radiologista');
 
-    if (currentUser.type === 'paciente') {
-      showSection('patient-consent');
-    } else {
-      updateDashboard();
+    if (accessType === 'paciente') showSection('patient-dashboard');
+    else {
+      await updateDashboard();
       showSection('dashboard');
     }
   } catch (error) {
-    console.error('Erro inesperado no login:', error);
-    return notify('Não foi possível concluir o login. Tente novamente.');
+    console.error('Erro de login:', error);
+    await window.radiaSupabase.auth.signOut();
+    notify('Não foi possível concluir o login.');
   }
 }
 
 function showSection(id) {
-  if(currentUser?.type==='paciente' && !['patient-consent','patient-feedback'].includes(id)) return;
-  if(currentUser?.type==='radiologista' && ['patient-consent','patient-feedback'].includes(id)) return;
-  document.querySelectorAll('main > section').forEach(s=>s.classList.add('hidden'));
-  const target=document.getElementById('sec-'+id);
-  if(target) target.classList.remove('hidden');
-  if(id==='history') loadHistory();
-  if(id==='logs') loadLogs();
-  if(id==='dashboard') updateDashboard();
-  if(id==='patient-feedback') loadPatientFeedback();
+  const patientSections = ['patient-dashboard', 'patient-exams', 'patient-notifications', 'patient-consent', 'patient-feedback'];
+  if (currentUser?.type === 'paciente' && !patientSections.includes(id)) return;
+  if (currentUser?.type === 'radiologista' && patientSections.includes(id)) return;
+  document.querySelectorAll('main > section').forEach(section => section.classList.add('hidden'));
+  document.getElementById(`sec-${id}`)?.classList.remove('hidden');
+  if (id === 'history') loadHistory();
+  if (id === 'logs') loadLogs();
+  if (id === 'dashboard') updateDashboard();
+  if (id === 'patient-feedback') loadPatientFeedback();
+  if (['patient-dashboard', 'patient-exams', 'patient-notifications'].includes(id)) renderPatientArea();
+  if (id === 'queue') renderEnhancedQueue();
 }
-function loadPatientFeedback(){
-  const box=document.getElementById('patient-feedback-list');
-  const items=exams.filter(e=>e.patientCpf===currentUser?.identifier && e.feedback);
-  if(!items.length){ box.innerHTML='<div class="bg-white p-6 rounded-xl border text-slate-500">Nenhum feedback foi disponibilizado pelo radiologista até o momento.</div>'; return; }
-  box.innerHTML=items.slice().reverse().map(e=>`<div class="bg-white p-6 rounded-xl border shadow-sm"><div class="flex justify-between gap-4"><div><p class="font-bold">${esc(e.type)} • ${esc(e.region)}</p><p class="text-xs text-slate-500 mt-1">Exame em ${esc(formatDate(e.date))}</p></div><span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Feedback disponível</span></div><p class="mt-4 whitespace-pre-wrap text-slate-700">${esc(e.feedback)}</p></div>`).join('');
-}
-function toggleUploadButton() {
-  document.getElementById('select-file-btn').disabled=!document.getElementById('consent-checkbox').checked;
-}
-function openConsentDetails(){ document.getElementById('consent-modal').classList.remove('hidden'); document.getElementById('consent-modal').classList.add('flex'); }
-function closeConsentDetails(){ document.getElementById('consent-modal').classList.add('hidden'); document.getElementById('consent-modal').classList.remove('flex'); }
 
-// REQ-UPLOAD + REQ-LGPD: impede o envio do exame antes da manifestação de consentimento.
-// Formatos previstos pelo documento: DICOM, PNG, JPG e PDF.
+async function loadPatientFeedback() {
+  const box = document.getElementById('patient-feedback-list');
+  if (!box) return;
+  box.innerHTML = '<div class="bg-white p-6 rounded-xl border text-slate-500">Carregando...</div>';
+  try {
+    const items = await window.RadiaExamService.patientFeedback();
+    box.innerHTML = items.length ? items.map(item => {
+      const exam = item.exames || {};
+      return `<div class="bg-white p-6 rounded-xl border shadow-sm"><p class="font-bold">${esc(exam.tipo_exame)} • ${esc(exam.regiao_corpo)}</p><p class="text-xs text-slate-500 mt-1">${esc(formatDate(exam.data_exame))}</p><p class="mt-4 whitespace-pre-wrap text-slate-700">${esc(item.retorno_paciente)}</p></div>`;
+    }).join('') : '<div class="bg-white p-6 rounded-xl border text-slate-500">Nenhum feedback foi disponibilizado.</div>';
+  } catch (error) {
+    console.error(error);
+    box.innerHTML = '<div class="bg-red-50 p-6 rounded-xl border border-red-200 text-red-700">Não foi possível carregar os feedbacks.</div>';
+  }
+}
+
+function toggleUploadButton() {
+  const button = document.getElementById('select-file-btn');
+  if (button) button.disabled = !document.getElementById('consent-checkbox')?.checked;
+}
+
+function openConsentDetails() {
+  const modal = document.getElementById('consent-modal');
+  modal?.classList.remove('hidden');
+  modal?.classList.add('flex');
+}
+
+function closeConsentDetails() {
+  const modal = document.getElementById('consent-modal');
+  modal?.classList.add('hidden');
+  modal?.classList.remove('flex');
+}
+
 function prepareExamFile() {
-  const input=document.getElementById('file-input');
-  if(!input.files[0]) return;
-  if(!document.getElementById('consent-checkbox').checked) return notify('O consentimento do paciente é obrigatório antes do envio.');
-  const file=input.files[0], ext=file.name.toLowerCase().split('.').pop();
-  const allowed=['dcm','dicom','png','jpg','jpeg','pdf'];
-  if(!allowed.includes(ext)) return notify('Formato não permitido.');
-  const patient=document.getElementById('patient-name').value.trim();
-  const type=document.getElementById('exam-type').value.trim();
-  const region=document.getElementById('body-region').value.trim();
-  if(!patient || !type || !region) {
-    input.value='';
-    return notify('Preencha paciente, tipo e região antes de selecionar o exame.');
+  const input = document.getElementById('file-input');
+  const file = input?.files?.[0];
+  if (!file) return;
+  try {
+    window.RadiaExamService.assertFile(file);
+    if (!document.getElementById('consent-checkbox')?.checked) throw new Error('Confirme o consentimento antes do envio.');
+    ['patient-name', 'patient-cpf', 'exam-type', 'body-region'].forEach(id => {
+      if (!document.getElementById(id)?.value.trim()) throw new Error('Preencha paciente, CPF, tipo e região antes de selecionar a imagem.');
+    });
+  } catch (error) {
+    input.value = '';
+    return notify(error.message);
   }
-  document.getElementById('file-name').innerText=file.name;
-  const date=document.getElementById('exam-date').value || new Date().toISOString().slice(0,10);
-  document.getElementById('exam-date').value=date;
-  renderPreview(file,ext);
-  document.getElementById('upload-box').classList.add('opacity-80');
+
+  document.getElementById('file-name').textContent = `${file.name} • ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = URL.createObjectURL(file);
+  const image = document.getElementById('exam-img-preview');
+  image.src = previewUrl;
+  document.getElementById('exam-image-stage').classList.remove('hidden');
+  document.getElementById('dicom-preview')?.classList.add('hidden');
+  document.getElementById('pdf-preview')?.classList.add('hidden');
   document.getElementById('exam-workspace').classList.remove('hidden');
-  addLog('Exame recebido com consentimento registrado: '+patient+' | '+file.name);
+  resetAiPanel('pendente', 'Imagem validada. Envie para iniciar a análise.');
 }
-function renderPreview(file,ext) {
-  ['exam-img-preview','pdf-preview','dicom-preview'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-  if(['png','jpg','jpeg'].includes(ext)) {
-    const reader=new FileReader();
-    reader.onload=e=>{document.getElementById('exam-img-preview').src=e.target.result;document.getElementById('exam-img-preview').classList.remove('hidden');};
-    reader.readAsDataURL(file);
-  } else if(ext==='pdf') {
-    document.getElementById('pdf-preview').src=URL.createObjectURL(file);
-    document.getElementById('pdf-preview').classList.remove('hidden');
-  } else document.getElementById('dicom-preview').classList.remove('hidden');
+
+function resetAiPanel(status, message) {
+  const badge = document.getElementById('ai-status-badge');
+  if (badge) badge.textContent = status;
+  const text = document.getElementById('ai-status-message');
+  if (text) text.textContent = message;
+  const model = document.getElementById('ai-model-name');
+  if (model) model.textContent = 'YOLOv8 GRAZPEDWRI-DX';
+  window.RadiaAIViewer.renderList(document.getElementById('ai-findings-list'), []);
+  window.RadiaAIViewer.renderOverlay(document.getElementById('ai-overlay'), []);
 }
-// REQ-LAUDO: registra revisão/aprovação manual do profissional enquanto a IA permanece desativada.
-// REQ-LGPD: grava evidência do consentimento (versão, finalidade e data/hora).
-function collectExam(status, reason='') {
-  const file=document.getElementById('file-input').files[0];
-  const consent=document.getElementById('consent-checkbox').checked;
-  if(!consent) return notify('Não é possível registrar o exame sem consentimento.');
-  if(!file) return notify('Selecione o exame.');
-  const exam={
-    id:crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    date:document.getElementById('exam-date').value,
-    patient:document.getElementById('patient-name').value.trim(),
-    patientCpf:document.getElementById('patient-cpf')?.value.replace(/\D/g,'') || '',
-    type:document.getElementById('exam-type').value.trim(),
-    region:document.getElementById('body-region').value.trim(),
-    fileName:file.name,
-    fileType:file.name.toLowerCase().split('.').pop(),
-    image:document.getElementById('exam-img-preview').src || '',
-    laudo:document.getElementById('laudo-text').value.trim(),
-    notes:document.getElementById('doctor-notes').value.trim(),
-    feedback:document.getElementById('patient-feedback').value.trim(),
-    status,
-    rejectionReason:reason,
-    consent:{accepted:true, version:CONSENT_VERSION, timestamp:new Date().toISOString(), purpose:'Atendimento médico e compartilhamento da imagem com o profissional responsável'},
-    reviewedBy:currentUser ? currentUser.identifier : '',
-    createdAt:new Date().toISOString()
-  };
-  exams.push(exam); saveData();
-  addLog((status==='Aprovado'?'Laudo aprovado':'Exame rejeitado')+': '+exam.patient);
-  notify(status==='Aprovado'?'Laudo aprovado e exame registrado.':'Exame rejeitado e registrado.');
-  resetExamForm(); showSection('history');
-}
-function finalizeExam(status){ collectExam(status); }
-function showRejectBox(){ document.getElementById('reject-box').classList.remove('hidden'); }
-function rejectExam(){
-  const reason=document.getElementById('reject-reason').value.trim();
-  if(!reason) return notify('Informe o motivo da rejeição.');
-  collectExam('Rejeitado',reason);
-}
-function saveData(){
-  localStorage.setItem('radia_exams',JSON.stringify(exams));
-  localStorage.setItem('radia_logs',JSON.stringify(logs));
-}
-// REQ-AUDITORIA/SEGURANÇA: protótipo registra eventos relevantes. Em produção, os logs devem ser protegidos contra alteração.
-function addLog(msg){
-  logs.push({time:new Date().toLocaleString('pt-BR'),msg});
-  saveData();
-}
-function resetExamForm(){
-  ['patient-name','patient-cpf','exam-type','body-region','laudo-text','doctor-notes','patient-feedback','reject-reason'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('file-input').value='';
-  document.getElementById('file-name').innerText='Nenhum arquivo selecionado';
-  document.getElementById('consent-checkbox').checked=false;
-  toggleUploadButton();
-  document.getElementById('exam-workspace').classList.add('hidden');
-  document.getElementById('upload-box').classList.remove('opacity-80');
-  document.getElementById('reject-box').classList.add('hidden');
-}
-// REQ-HISTÓRICO/BUSCA: permite filtrar exames por paciente, data, tipo e região corporal.
-function loadHistory(){
-  const body=document.getElementById('history-table-body');
-  const n=(document.getElementById('search-name')?.value||'').toLowerCase();
-  const d=document.getElementById('search-date')?.value||'';
-  const t=(document.getElementById('search-type')?.value||'').toLowerCase();
-  const r=(document.getElementById('search-region')?.value||'').toLowerCase();
-  const filtered=exams.filter(e=>
-    (!n||e.patient.toLowerCase().includes(n)) &&
-    (!d||e.date===d) &&
-    (!t||e.type.toLowerCase().includes(t)) &&
-    (!r||e.region.toLowerCase().includes(r))
-  );
-  if(!filtered.length){body.innerHTML='<tr><td colspan="6" class="p-6 text-center text-slate-400">Nenhum exame encontrado.</td></tr>';return;}
-  body.innerHTML=filtered.slice().reverse().map(e=>`
-    <tr class="border-b hover:bg-slate-50">
-      <td class="p-4 text-sm">${esc(formatDate(e.date))}</td><td class="p-4 font-semibold">${esc(e.patient)}</td>
-      <td class="p-4">${esc(e.type)}</td><td class="p-4">${esc(e.region)}</td>
-      <td class="p-4"><span class="px-2 py-1 rounded ${e.status==='Aprovado'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${esc(e.status)}</span></td>
-      <td class="p-4"><button onclick="viewExam('${e.id}')" class="text-blue-600 font-semibold">Visualizar</button></td>
-    </tr>`).join('');
-}
-function formatDate(d){ if(!d) return ''; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; }
-function viewExam(id){
-  const exam=exams.find(e=>e.id===id); if(!exam)return;
-  currentExam=exam;
-  document.getElementById('modal-patient').innerText=exam.patient;
-  document.getElementById('modal-date').innerText=formatDate(exam.date);
-  document.getElementById('modal-type-region').innerText=exam.type+' • '+exam.region;
-  document.getElementById('modal-consent').innerText=`Registrado em ${new Date(exam.consent.timestamp).toLocaleString('pt-BR')} — termo ${exam.consent.version}.`;
-  document.getElementById('modal-laudo').innerText=exam.laudo || 'Sem laudo informado.';
-  document.getElementById('modal-notes').innerText=exam.notes || 'Sem observações.';
-  document.getElementById('modal-feedback').innerText=exam.feedback || 'Nenhum feedback disponibilizado ao paciente.';
-  const media=document.getElementById('modal-media'); media.innerHTML='';
-  if(exam.image){const img=document.createElement('img');img.src=exam.image;img.className='max-w-full max-h-[600px] object-contain';media.appendChild(img);}
-  else {media.innerHTML='<div class="text-center text-slate-500"><i class="fas fa-file-medical text-5xl mb-3"></i><p>Arquivo '+esc(exam.fileName)+' armazenado no registro.</p><p class="text-xs mt-2">A visualização DICOM/PDF depende do visualizador do ambiente.</p></div>';}
-  document.getElementById('modal-view').style.display='flex';
-}
-function closeModal(){document.getElementById('modal-view').style.display='none';}
-function printCurrentExam(){
-  if(!currentExam)return;
-  const w=window.open('','_blank');
-  w.document.write(`<html><head><title>Laudo — ${esc(currentExam.patient)}</title><style>body{font-family:Arial;padding:40px}h1{font-size:22px}.meta{color:#666;font-size:12px;text-transform:uppercase;margin-top:20px}.box{padding:16px;background:#f1f5f9;border-radius:8px;white-space:pre-wrap}</style></head><body><h1>RadIA — Resultado do Exame</h1><p><b>Paciente:</b> ${esc(currentExam.patient)}</p><p><b>Data:</b> ${esc(formatDate(currentExam.date))}</p><p><b>Exame:</b> ${esc(currentExam.type)} — ${esc(currentExam.region)}</p><p class="meta">Laudo</p><div class="box">${esc(currentExam.laudo||'Sem laudo')}</div><p class="meta">Observações</p><div class="box">${esc(currentExam.notes||'Sem observações')}</div><p class="meta">Consentimento</p><p>Termo ${esc(currentExam.consent.version)} registrado em ${esc(new Date(currentExam.consent.timestamp).toLocaleString('pt-BR'))}.</p></body></html>`);
-  w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
-}
-// REQ-EXPORTAÇÃO: usa a impressão do navegador para permitir 'Salvar como PDF'.
-// Em produção, recomenda-se geração de PDF no backend para padronização e rastreabilidade.
-function exportHistoryPDF(){ const first=exams[exams.length-1]; if(!first)return notify('Não há exames para exportar.'); viewExam(first.id); setTimeout(printCurrentExam,400); }
-function loadLogs(){
-  document.getElementById('log-container').innerHTML=logs.length?logs.slice().reverse().map(l=>`<div>[${esc(l.time)}] ${esc(l.msg)}</div>`).join(''):'<div>Nenhum log registrado.</div>';
-}
-// REQ-USABILIDADE: indicadores resumem exames e pendências para o profissional.
-function updateDashboard(){
-  const today=new Date().toISOString().slice(0,10);
-  document.getElementById('stats-today').innerText=exams.filter(e=>e.date===today).length;
-  document.getElementById('stats-history').innerText=exams.length;
-  document.getElementById('stats-pending').innerText=exams.filter(e=>e.status!=='Aprovado').length;
-  renderCharts();
-}
-function renderCharts(){
-  const byDay={}; exams.forEach(e=>byDay[e.date]=(byDay[e.date]||0)+1);
-  if(examChart)examChart.destroy();
-  examChart=new Chart(document.getElementById('examChart'),{type:'bar',data:{labels:Object.keys(byDay).map(formatDate),datasets:[{label:'Exames',data:Object.values(byDay)}]}});
-  if(statusChart)statusChart.destroy();
-  statusChart=new Chart(document.getElementById('statusChart'),{type:'doughnut',data:{labels:['Aprovados','Rejeitados'],datasets:[{data:[exams.filter(e=>e.status==='Aprovado').length,exams.filter(e=>e.status==='Rejeitado').length]}]}});
-}
-async function logout(){
-  if (window.radiaSupabase) {
-    await window.radiaSupabase.auth.signOut();
+
+async function startAIAnalysis() {
+  const file = document.getElementById('file-input')?.files?.[0];
+  const button = document.getElementById('start-ai-analysis-btn');
+  if (!file) return notify('Selecione a radiografia antes de iniciar a análise.');
+  button.disabled = true;
+  button.textContent = 'Enviando e processando...';
+  resetAiPanel('processando', 'Upload privado em andamento. Aguarde o processamento do modelo.');
+  try {
+    const result = await window.RadiaExamService.uploadAndAnalyze({
+      file,
+      patientCpf: document.getElementById('patient-cpf').value,
+      examDate: document.getElementById('exam-date').value,
+      examType: document.getElementById('exam-type').value.trim(),
+      bodyRegion: document.getElementById('body-region').value.trim(),
+      notes: document.getElementById('doctor-notes').value.trim(),
+    });
+    activeExamId = result.exam.id;
+    await refreshAnalysis();
+    notify('Análise concluída. Revise os achados antes de emitir o laudo.');
+  } catch (error) {
+    if (error.exam?.id) activeExamId = error.exam.id;
+    console.error('Falha na análise:', error);
+    resetAiPanel('erro', error.message || 'Falha no processamento.');
+    notify(error.message || 'Não foi possível analisar a imagem.');
+  } finally {
+    button.disabled = false;
+    button.textContent = activeExamId ? 'Tentar análise novamente' : 'Enviar e analisar com IA';
   }
+}
+
+async function retryAIAnalysis() {
+  if (!activeExamId) return startAIAnalysis();
+  const button = document.getElementById('start-ai-analysis-btn');
+  button.disabled = true;
+  resetAiPanel('processando', 'Nova tentativa em andamento...');
+  try {
+    await window.RadiaExamService.requestAnalysis(activeExamId);
+    await refreshAnalysis();
+  } catch (error) {
+    resetAiPanel('erro', error.message);
+    notify(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshAnalysis() {
+  if (!activeExamId) return;
+  currentAnalysis = await window.RadiaExamService.latestAnalysis(activeExamId);
+  if (!currentAnalysis) return resetAiPanel('pendente', 'Análise ainda não registrada.');
+  document.getElementById('ai-status-badge').textContent = currentAnalysis.status;
+  document.getElementById('ai-model-name').textContent = [currentAnalysis.nome_modelo, currentAnalysis.versao_modelo]
+    .filter(Boolean).join(' • ');
+  const message = document.getElementById('ai-status-message');
+  if (currentAnalysis.status === 'erro') message.textContent = currentAnalysis.erro_mensagem || 'Falha técnica na análise.';
+  else if (currentAnalysis.status === 'concluido') message.textContent = `${currentAnalysis.achados.length} achado(s) preliminar(es).`;
+  else message.textContent = 'Processamento em andamento.';
+  window.RadiaAIViewer.renderList(document.getElementById('ai-findings-list'), currentAnalysis.achados);
+  window.RadiaAIViewer.renderOverlay(document.getElementById('ai-overlay'), currentAnalysis.achados);
+}
+
+function toggleAIOverlay() {
+  const visible = document.getElementById('toggle-ai-overlay')?.checked;
+  document.getElementById('ai-overlay')?.classList.toggle('hidden', !visible);
+}
+
+async function finalizeExam() {
+  if (!activeExamId) return notify('Envie e registre o exame antes de aprovar o laudo.');
+  const reportText = document.getElementById('laudo-text').value.trim();
+  if (!reportText) return notify('Digite a conclusão profissional no laudo.');
+  try {
+    await window.RadiaExamService.saveReview({
+      examId: activeExamId,
+      decision: 'aprovada',
+      reportText,
+      patientFeedback: document.getElementById('patient-feedback').value.trim(),
+      reason: '',
+    });
+    notify('Laudo e revisão profissional aprovados.');
+    resetExamForm();
+    showSection('history');
+  } catch (error) {
+    console.error(error);
+    notify(error.message || 'Não foi possível aprovar o laudo.');
+  }
+}
+
+function showRejectBox() {
+  document.getElementById('reject-box').classList.remove('hidden');
+}
+
+async function rejectExam() {
+  if (!activeExamId) return notify('Envie e registre o exame antes de rejeitar a análise.');
+  const reason = document.getElementById('reject-reason').value.trim();
+  const reportText = document.getElementById('laudo-text').value.trim();
+  if (!reason || !reportText) return notify('Informe o laudo e o motivo da rejeição.');
+  try {
+    await window.RadiaExamService.saveReview({
+      examId: activeExamId,
+      decision: 'rejeitada',
+      reportText,
+      patientFeedback: document.getElementById('patient-feedback').value.trim(),
+      reason,
+    });
+    notify('Análise rejeitada e conclusão profissional registrada.');
+    resetExamForm();
+    showSection('history');
+  } catch (error) {
+    notify(error.message || 'Não foi possível registrar a rejeição.');
+  }
+}
+
+function resetExamForm() {
+  ['patient-name', 'patient-cpf', 'exam-type', 'body-region', 'laudo-text', 'doctor-notes', 'patient-feedback', 'reject-reason']
+    .forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-name').textContent = 'Nenhum arquivo selecionado';
+  document.getElementById('exam-image-stage').classList.add('hidden');
+  document.getElementById('exam-workspace').classList.add('hidden');
+  document.getElementById('reject-box').classList.add('hidden');
+  document.getElementById('consent-checkbox').checked = true;
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = null;
+  activeExamId = null;
+  currentAnalysis = null;
+  document.getElementById('start-ai-analysis-btn').textContent = 'Enviar e analisar com IA';
+}
+
+async function loadHistory() {
+  const body = document.getElementById('history-table-body');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Carregando...</td></tr>';
+  try {
+    let exams = await window.RadiaExamService.listExams();
+    const date = document.getElementById('search-date')?.value || '';
+    const type = (document.getElementById('search-type')?.value || '').toLowerCase();
+    const region = (document.getElementById('search-region')?.value || '').toLowerCase();
+    exams = exams.filter(exam => (!date || exam.data_exame === date)
+      && (!type || exam.tipo_exame.toLowerCase().includes(type))
+      && (!region || exam.regiao_corpo.toLowerCase().includes(region)));
+    body.innerHTML = exams.length ? exams.map(exam => `<tr class="border-b hover:bg-slate-50">
+      <td class="p-4 text-sm">${esc(formatDate(exam.data_exame))}</td>
+      <td class="p-4 font-semibold">CPF final ${esc(exam.pacientes?.cpf?.slice(-4) || '—')}</td>
+      <td class="p-4">${esc(exam.tipo_exame)}</td><td class="p-4">${esc(exam.regiao_corpo)}</td>
+      <td class="p-4"><span class="px-2 py-1 rounded bg-slate-100">${esc(exam.status)}</span></td>
+      <td class="p-4"><button onclick="viewExam('${exam.id}')" class="text-blue-600 font-semibold">Visualizar</button></td>
+    </tr>`).join('') : '<tr><td colspan="6" class="p-6 text-center text-slate-400">Nenhum exame encontrado.</td></tr>';
+  } catch (error) {
+    console.error(error);
+    body.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-red-600">Falha ao carregar os exames.</td></tr>';
+  }
+}
+
+function formatDate(date) {
+  if (!date) return '';
+  const [year, month, day] = date.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+async function viewExam(id) {
+  try {
+    currentExam = await window.RadiaExamService.examDetails(id);
+    document.getElementById('modal-patient').textContent = `CPF final ${currentExam.pacientes?.cpf?.slice(-4) || '—'}`;
+    document.getElementById('modal-date').textContent = formatDate(currentExam.data_exame);
+    document.getElementById('modal-type-region').textContent = `${currentExam.tipo_exame} • ${currentExam.regiao_corpo}`;
+    document.getElementById('modal-consent').textContent = `Termo ${CONSENT_VERSION}; consulte o registro de consentimento associado.`;
+    document.getElementById('modal-laudo').textContent = currentExam.laudo?.texto_laudo || 'Sem laudo.';
+    document.getElementById('modal-notes').textContent = currentExam.observacoes || 'Sem observações.';
+    document.getElementById('modal-feedback').textContent = currentExam.laudo?.retorno_paciente || 'Sem feedback.';
+    const media = document.getElementById('modal-media');
+    media.replaceChildren();
+    if (currentExam.imageUrl) {
+      const stage = document.createElement('div');
+      stage.className = 'relative inline-block max-w-full';
+      const image = document.createElement('img');
+      image.src = currentExam.imageUrl;
+      image.className = 'block max-w-full max-h-[600px] object-contain';
+      image.alt = 'Radiografia original do exame';
+      const overlay = document.createElement('div');
+      overlay.className = 'absolute inset-0 pointer-events-none';
+      stage.append(image, overlay);
+      media.appendChild(stage);
+      image.addEventListener('load', () => window.RadiaAIViewer.renderOverlay(overlay, currentExam.analise?.achados || []));
+    } else media.textContent = 'Imagem indisponível.';
+    document.getElementById('modal-view').style.display = 'flex';
+  } catch (error) {
+    console.error(error);
+    notify('Não foi possível abrir o exame.');
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-view').style.display = 'none';
+}
+
+function printCurrentExam() {
+  if (!currentExam) return;
+  const output = window.open('', '_blank');
+  if (!output) return notify('Permita pop-ups para imprimir o laudo.');
+  output.document.write(`<html><head><title>Laudo RadIA</title><style>body{font-family:Arial;padding:40px}.box{padding:16px;background:#f1f5f9;white-space:pre-wrap}</style></head><body><h1>RadIA — Laudo profissional</h1><p><b>Data:</b> ${esc(formatDate(currentExam.data_exame))}</p><p><b>Exame:</b> ${esc(currentExam.tipo_exame)} — ${esc(currentExam.regiao_corpo)}</p><p><b>IA:</b> resultado preliminar; sujeito a falsos positivos e falsos negativos.</p><div class="box">${esc(currentExam.laudo?.texto_laudo || 'Sem laudo')}</div></body></html>`);
+  output.document.close();
+  output.focus();
+  setTimeout(() => output.print(), 300);
+}
+
+async function exportHistoryPDF() {
+  notify('Abra um exame no histórico e use “Imprimir / Salvar como PDF”.');
+}
+
+async function loadLogs() {
+  const container = document.getElementById('log-container');
+  try {
+    const logs = await window.RadiaExamService.listAuditLogs();
+    container.innerHTML = logs.length ? logs.map(log => `<div>[${esc(new Date(log.criado_em).toLocaleString('pt-BR'))}] ${esc(log.acao)} • ${esc(log.tipo_entidade || '')}</div>`).join('') : '<div>Nenhum log disponível.</div>';
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = '<div>Não foi possível carregar os logs.</div>';
+  }
+}
+
+let patientExamsCache = [];
+
+async function renderPatientArea() {
+  try {
+    const [exams, notifications] = await Promise.all([
+      window.RadiaExamService.listExams(),
+      window.RadiaExamService.notifications(),
+    ]);
+    patientExamsCache = exams;
+    const completed = exams.filter(exam => exam.status === 'concluido').length;
+    document.getElementById('patient-kpi-total').textContent = exams.length;
+    document.getElementById('patient-kpi-progress').textContent = exams.length - completed;
+    document.getElementById('patient-kpi-done').textContent = completed;
+    document.getElementById('patient-exam-badge').textContent = exams.length;
+    document.getElementById('patient-notif-badge').textContent = notifications.filter(item => !item.lido_em).length;
+
+    const updates = document.getElementById('patient-dashboard-updates');
+    updates.innerHTML = notifications.length ? notifications.slice(0, 5).map(item => `
+      <div class="rounded-xl border bg-slate-50 p-3">
+        <p class="text-sm font-semibold">${esc(item.titulo)}</p>
+        <p class="mt-1 text-xs text-slate-500">${esc(item.mensagem)}</p>
+        <p class="mt-1 text-xs text-slate-400">${esc(new Date(item.criado_em).toLocaleString('pt-BR'))}</p>
+      </div>`).join('') : '<div class="py-8 text-center text-sm text-slate-400">Nenhuma atualização disponível.</div>';
+    renderPatientExams();
+    renderPatientNotifications(notifications);
+  } catch (error) {
+    console.error('Falha ao carregar área do paciente:', error);
+    notify('Não foi possível carregar a área do paciente.');
+  }
+}
+
+function renderPatientExams() {
+  const container = document.getElementById('patient-exams-list');
+  if (!container) return;
+  const search = (document.getElementById('patient-exam-search')?.value || '').toLowerCase();
+  const statusLabel = document.getElementById('patient-exam-filter')?.value || '';
+  const statusMap = { 'Pendente': 'pendente', 'Em análise': 'em_analise', 'Concluído': 'concluido' };
+  const status = statusMap[statusLabel] || '';
+  const exams = patientExamsCache.filter(exam =>
+    (!search || exam.id.toLowerCase().includes(search) || exam.tipo_exame.toLowerCase().includes(search))
+    && (!status || exam.status === status));
+  container.innerHTML = exams.length ? exams.map(exam => `
+    <div class="flex flex-col justify-between gap-4 p-5 md:flex-row md:items-center">
+      <div><p class="font-bold">${esc(exam.tipo_exame)} • ${esc(exam.regiao_corpo)}</p><p class="mt-1 text-xs text-slate-500">${esc(formatDate(exam.data_exame))} • ${esc(exam.id)}</p></div>
+      <div class="flex items-center gap-3"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">${esc(exam.status)}</span><button onclick="showPatientExamDetails('${exam.id}')" class="rounded-lg border px-3 py-2 text-xs font-semibold">Detalhes</button></div>
+    </div>`).join('') : '<div class="p-12 text-center text-slate-400">Nenhum exame encontrado.</div>';
+}
+
+function renderPatientNotifications(notifications) {
+  const container = document.getElementById('patient-notifications-list');
+  if (!container) return;
+  container.innerHTML = notifications.length ? notifications.map(item => `
+    <div class="rounded-2xl border bg-white p-5 ${item.lido_em ? 'opacity-70' : ''}">
+      <p class="font-semibold">${esc(item.titulo)}</p><p class="mt-1 text-sm text-slate-500">${esc(item.mensagem)}</p><p class="mt-2 text-xs text-slate-400">${esc(new Date(item.criado_em).toLocaleString('pt-BR'))}</p>
+    </div>`).join('') : '<div class="rounded-2xl border bg-white p-10 text-center text-slate-400">Nenhuma atualização.</div>';
+}
+
+function showPatientExamDetails(id) {
+  viewExam(id);
+}
+
+async function markPatientNotificationsRead() {
+  try {
+    await window.RadiaExamService.markNotificationsRead();
+    await renderPatientArea();
+  } catch (error) {
+    notify('Não foi possível atualizar as notificações.');
+  }
+}
+
+async function renderEnhancedQueue() {
+  const container = document.getElementById('enhanced-queue-list');
+  if (!container) return;
+  try {
+    const search = (document.getElementById('queue-search')?.value || '').toLowerCase();
+    const statusLabel = document.getElementById('queue-status')?.value || '';
+    const statusMap = { 'Pendente': 'pendente', 'Em análise': 'em_analise', 'Concluído': 'concluido' };
+    const status = statusMap[statusLabel] || '';
+    const exams = (await window.RadiaExamService.listExams()).filter(exam =>
+      (!search || exam.id.toLowerCase().includes(search) || exam.tipo_exame.toLowerCase().includes(search) || String(exam.pacientes?.cpf || '').includes(search))
+      && (!status || exam.status === status));
+    document.getElementById('queue-badge').textContent = exams.filter(exam => exam.status !== 'concluido').length;
+    container.innerHTML = exams.length ? exams.map(exam => `
+      <div class="flex flex-col justify-between gap-4 p-5 md:flex-row md:items-center">
+        <div><p class="font-bold">${esc(exam.tipo_exame)} • ${esc(exam.regiao_corpo)}</p><p class="mt-1 text-xs text-slate-500">CPF final ${esc(exam.pacientes?.cpf?.slice(-4) || '—')} • ${esc(formatDate(exam.data_exame))}</p></div>
+        <div class="flex items-center gap-3"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">${esc(exam.status)}</span><button onclick="viewExam('${exam.id}')" class="text-sm font-semibold text-blue-600">Abrir</button></div>
+      </div>`).join('') : '<div class="p-12 text-center text-slate-400">Nenhum exame na fila.</div>';
+  } catch (error) {
+    container.innerHTML = '<div class="p-12 text-center text-red-600">Falha ao carregar a fila.</div>';
+  }
+}
+
+function openEnhancedExamModal() {
+  showSection('new-exam');
+}
+
+function closeEnhancedExamModal() {
+  document.getElementById('enhanced-exam-modal')?.classList.add('hidden');
+}
+
+function exportEnhancedData() {
+  notify('A exportação de dados clínicos foi desativada por privacidade. Exporte apenas laudos individualmente.');
+}
+
+function resetEnhancedData() {
+  notify('O RadIA não mantém exames no armazenamento local do navegador.');
+}
+
+async function updateDashboard() {
+  try {
+    const exams = await window.RadiaExamService.listExams();
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('stats-today').textContent = exams.filter(exam => exam.data_exame === today).length;
+    document.getElementById('stats-history').textContent = exams.length;
+    document.getElementById('stats-pending').textContent = exams.filter(exam => !['concluido', 'rejeitado'].includes(exam.status)).length;
+    renderCharts(exams);
+  } catch (error) {
+    console.error('Falha ao atualizar painel:', error);
+  }
+}
+
+function renderCharts(exams) {
+  const byDay = {};
+  exams.forEach(exam => { byDay[exam.data_exame] = (byDay[exam.data_exame] || 0) + 1; });
+  if (examChart) examChart.destroy();
+  examChart = new Chart(document.getElementById('examChart'), {
+    type: 'bar', data: { labels: Object.keys(byDay).map(formatDate), datasets: [{ label: 'Exames', data: Object.values(byDay) }] },
+  });
+  if (statusChart) statusChart.destroy();
+  statusChart = new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: { labels: ['Concluídos', 'Em análise', 'Rejeitados'], datasets: [{ data: [
+      exams.filter(exam => exam.status === 'concluido').length,
+      exams.filter(exam => ['pendente', 'em_analise'].includes(exam.status)).length,
+      exams.filter(exam => exam.status === 'rejeitado').length,
+    ] }] },
+  });
+}
+
+async function logout() {
+  await window.radiaSupabase?.auth.signOut();
   location.reload();
 }
-document.getElementById('exam-date').value=new Date().toISOString().slice(0,10);
-toggleLoginFields();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const date = document.getElementById('exam-date');
+  if (date) date.value = new Date().toISOString().slice(0, 10);
+  toggleLoginFields();
+  toggleUploadButton();
+  document.getElementById('toggle-ai-overlay')?.addEventListener('change', toggleAIOverlay);
+  const aiButton = document.getElementById('start-ai-analysis-btn');
+  aiButton?.addEventListener('click', () => activeExamId ? retryAIAnalysis() : startAIAnalysis());
+});
